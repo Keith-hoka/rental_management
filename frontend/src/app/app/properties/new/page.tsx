@@ -64,6 +64,15 @@ export default function NewPropertyPage() {
           <option value="townhouse">Townhouse</option>
           <option value="other">Other</option>
         </select>
+        <select
+          aria-label="Status"
+          value={form.status}
+          onChange={(e) => set("status", e.target.value as PropertyInput["status"])}
+          className="w-full rounded border px-3 py-2"
+        >
+          <option value="vacant">Vacant</option>
+          <option value="occupied">Occupied</option>
+        </select>
         <div className="flex gap-2">
           <input
             type="number"
