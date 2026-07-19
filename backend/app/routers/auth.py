@@ -10,7 +10,14 @@ from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import get_current_membership, get_current_user
 from app.core.email import send_email
-from app.core.security import create_token, decode_token, hash_password, verify_password
+from app.core.security import (
+    create_reset_token,
+    create_token,
+    decode_token,
+    hash_password,
+    password_fingerprint,
+    verify_password,
+)
 from app.models import Membership, Organization, Role, User
 from app.schemas.auth import (
     ForgotPasswordRequest,
@@ -104,7 +111,7 @@ async def forgot_password(
         await session.execute(select(User).where(User.email == body.email))
     ).scalar_one_or_none()
     if user:
-        token = create_token(user.email, "reset", timedelta(minutes=30))
+        token = create_reset_token(user.email, user.hashed_password, timedelta(minutes=30))
         reset_url = f"{settings.frontend_url}/reset-password?token={token}"
         html = (
             "<p>We received a request to reset your password.</p>"
@@ -134,6 +141,10 @@ async def reset_password(
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid token")
+    if payload.get("pwfp") != password_fingerprint(user.hashed_password):
+        # The password already changed since this link was issued: the link
+        # was already used, or a newer one was requested. Reject as single-use.
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     user.hashed_password = hash_password(body.new_password)
     await session.commit()
     return {"status": "ok"}
