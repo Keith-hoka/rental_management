@@ -23,8 +23,23 @@ locale assumptions.
 - **Scheduler**: APScheduler inside the FastAPI process (rent charge generation, reminders)
 - **Email**: provider-agnostic sender interface; SMTP in dev, a service (e.g. Resend) in prod
 - **File storage**: local disk volume in MVP (property images, maintenance photos); S3-compatible storage with signed URLs in v3
-- **AI features**: Claude API (post-v2)
+- **AI features**: Claude API via the official Anthropic Python SDK (post-v2).
+  Extraction-style features (maintenance triage, lease summary, email drafts,
+  OCR) use single calls with structured outputs (`messages.parse()` +
+  Pydantic). The chatbot agent uses the SDK's built-in tool runner
+  (`@beta_tool` + `client.beta.messages.tool_runner()`) with database query
+  tools. No agent framework (LangGraph etc.) unless multi-agent workflows
+  emerge later.
+- **CI**: GitHub Actions — backend job (ruff + pytest against a Postgres
+  service container), frontend job (lint + build), on every push/PR
 - **Deploy**: frontend on Vercel; API + Postgres on Railway or Render
+
+**Deliberately deferred infrastructure** (add only when the need is measured):
+- **Redis**: no cache in MVP — Postgres handles all queries at this scale.
+  Introduced in Phase 3 as the Celery broker.
+- **Celery**: MVP background work (charge generation, reminders) fits
+  APScheduler. Celery + Redis arrive in Phase 3 for long-running AI jobs
+  (PDF parsing, image analysis) that must not block HTTP requests.
 
 ## 3. Architecture
 
