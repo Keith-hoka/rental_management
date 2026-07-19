@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_session
-from app.core.security import create_token, hash_password
+from app.core.security import create_token, hash_password, verify_password
 from app.models import Membership, Organization, Role, User
-from app.schemas.auth import SignupRequest, TokenPair
+from app.schemas.auth import LoginRequest, SignupRequest, TokenPair
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -37,4 +37,19 @@ async def signup(body: SignupRequest, session: AsyncSession = Depends(get_sessio
     await session.flush()
     session.add(Membership(user_id=user.id, organization_id=org.id, role=Role.landlord))
     await session.commit()
+    return issue_tokens(str(user.id))
+
+
+@router.post("/login", response_model=TokenPair)
+async def login(body: LoginRequest, session: AsyncSession = Depends(get_session)) -> TokenPair:
+    """Exchange email + password for a token pair."""
+    user = (
+        await session.execute(select(User).where(User.email == body.email))
+    ).scalar_one_or_none()
+    if (
+        not user
+        or not user.hashed_password
+        or not verify_password(body.password, user.hashed_password)
+    ):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     return issue_tokens(str(user.id))
