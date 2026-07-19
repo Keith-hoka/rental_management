@@ -1,14 +1,22 @@
 from datetime import timedelta
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_session
-from app.core.security import create_token, hash_password, verify_password
+from app.core.deps import get_current_membership, get_current_user
+from app.core.security import create_token, decode_token, hash_password, verify_password
 from app.models import Membership, Organization, Role, User
-from app.schemas.auth import LoginRequest, SignupRequest, TokenPair
+from app.schemas.auth import (
+    LoginRequest,
+    MeResponse,
+    RefreshRequest,
+    SignupRequest,
+    TokenPair,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -53,3 +61,30 @@ async def login(body: LoginRequest, session: AsyncSession = Depends(get_session)
     ):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     return issue_tokens(str(user.id))
+
+
+@router.get("/me", response_model=MeResponse)
+async def me(
+    user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
+) -> MeResponse:
+    """Return the authenticated user's profile and role."""
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        role=membership.role.value,
+        organization_id=membership.organization_id,
+    )
+
+
+@router.post("/refresh", response_model=TokenPair)
+async def refresh(body: RefreshRequest) -> TokenPair:
+    """Exchange a valid refresh token for a new token pair."""
+    try:
+        payload = decode_token(body.refresh_token)
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+    return issue_tokens(payload["sub"])
