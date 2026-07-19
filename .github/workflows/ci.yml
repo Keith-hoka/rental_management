@@ -90,9 +90,18 @@ jobs:
           cd backend
           uv run alembic upgrade head
           uv run uvicorn app.main:app --port 8000 &
+          backend_pid=$!
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/health && break
             sleep 1
           done
           cd ../frontend
+          set +e
           npm run test:e2e
+          e2e_exit=$?
+          set -e
+          # Stop the backend so no orphan uv process holds the cache during
+          # the setup-uv post-run cache prune (would fail the job otherwise).
+          kill "$backend_pid" 2>/dev/null || true
+          pkill -f "uvicorn app.main:app" 2>/dev/null || true
+          exit $e2e_exit
