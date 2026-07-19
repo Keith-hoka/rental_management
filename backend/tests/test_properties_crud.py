@@ -40,3 +40,19 @@ async def test_create_property_returns_201(client):
 async def test_create_property_requires_auth(client):
     response = await client.post("/api/v1/properties", json=NEW_PROPERTY)
     assert response.status_code == 401
+
+
+async def test_get_property_returns_it(client):
+    headers = await landlord_headers(client)
+    created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=headers)).json()
+    response = await client.get(f"/api/v1/properties/{created['id']}", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["id"] == created["id"]
+
+
+async def test_get_property_in_other_org_is_404(client):
+    org_a = await landlord_headers(client, "a2@example.com")
+    org_b = await landlord_headers(client, "b2@example.com")
+    created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=org_a)).json()
+    response = await client.get(f"/api/v1/properties/{created['id']}", headers=org_b)
+    assert response.status_code == 404

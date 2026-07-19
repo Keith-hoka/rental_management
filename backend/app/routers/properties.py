@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,3 +40,30 @@ async def list_properties(
         .order_by(Property.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_owned_property(
+    property_id: uuid.UUID, membership: Membership, session: AsyncSession
+) -> Property:
+    """Fetch a property in the caller's org, or raise 404."""
+    prop = (
+        await session.execute(
+            select(Property).where(
+                Property.id == property_id,
+                Property.organization_id == membership.organization_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return prop
+
+
+@router.get("/{property_id}", response_model=PropertyResponse)
+async def get_property(
+    property_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Property:
+    """Fetch a single property in the caller's organization."""
+    return await get_owned_property(property_id, membership, session)
