@@ -1,0 +1,41 @@
+from tests.test_properties_crud import landlord_headers
+
+
+async def make_property(client, headers, address, status="vacant", ptype="house"):
+    return await client.post(
+        "/api/v1/properties",
+        json={
+            "address": address,
+            "type": ptype,
+            "bedrooms": 2,
+            "bathrooms": 1,
+            "parking": 0,
+            "status": status,
+            "image_urls": [],
+        },
+        headers=headers,
+    )
+
+
+async def test_search_by_address_substring(client):
+    headers = await landlord_headers(client, "search@example.com")
+    await make_property(client, headers, "12 Oak Avenue")
+    await make_property(client, headers, "99 Pine Street")
+
+    response = await client.get("/api/v1/properties?search=oak", headers=headers)
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["address"] == "12 Oak Avenue"
+
+
+async def test_filter_by_status_and_type(client):
+    headers = await landlord_headers(client, "filter@example.com")
+    await make_property(client, headers, "A", status="vacant", ptype="house")
+    await make_property(client, headers, "B", status="occupied", ptype="condo")
+
+    vacant = await client.get("/api/v1/properties?status=vacant", headers=headers)
+    assert [p["address"] for p in vacant.json()] == ["A"]
+
+    condo = await client.get("/api/v1/properties?type=condo", headers=headers)
+    assert [p["address"] for p in condo.json()] == ["B"]

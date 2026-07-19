@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.models import Membership, Property, Role
+from app.models import Membership, Property, PropertyStatus, PropertyType, Role
 from app.schemas.property import PropertyCreate, PropertyResponse, PropertyUpdate
 
 router = APIRouter(prefix="/api/v1/properties", tags=["properties"])
@@ -30,15 +30,21 @@ async def create_property(
 
 @router.get("", response_model=list[PropertyResponse])
 async def list_properties(
+    search: str | None = None,
+    status: PropertyStatus | None = None,
+    type: PropertyType | None = None,
     membership: Membership = Depends(manager),
     session: AsyncSession = Depends(get_session),
 ) -> list[Property]:
-    """List the caller organization's properties, newest first."""
-    result = await session.execute(
-        select(Property)
-        .where(Property.organization_id == membership.organization_id)
-        .order_by(Property.created_at.desc())
-    )
+    """List the caller org's properties, optionally searched and filtered."""
+    query = select(Property).where(Property.organization_id == membership.organization_id)
+    if search:
+        query = query.where(Property.address.ilike(f"%{search}%"))
+    if status:
+        query = query.where(Property.status == status)
+    if type:
+        query = query.where(Property.type == type)
+    result = await session.execute(query.order_by(Property.created_at.desc()))
     return list(result.scalars().all())
 
 
