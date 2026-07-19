@@ -8,12 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import get_current_membership, get_current_user
+from app.core.email import send_email
 from app.core.security import create_token, decode_token, hash_password, verify_password
 from app.models import Membership, Organization, Role, User
 from app.schemas.auth import (
+    ForgotPasswordRequest,
     LoginRequest,
     MeResponse,
     RefreshRequest,
+    ResetPasswordRequest,
     SignupRequest,
     TokenPair,
 )
@@ -88,3 +91,38 @@ async def refresh(body: RefreshRequest) -> TokenPair:
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid token type")
     return issue_tokens(payload["sub"])
+
+
+@router.post("/forgot-password", status_code=202)
+async def forgot_password(
+    body: ForgotPasswordRequest, session: AsyncSession = Depends(get_session)
+) -> dict[str, str]:
+    """Send a password reset link if the account exists. Always 202."""
+    user = (
+        await session.execute(select(User).where(User.email == body.email))
+    ).scalar_one_or_none()
+    if user:
+        token = create_token(user.email, "reset", timedelta(minutes=30))
+        send_email(user.email, "Reset your password", f"Reset token: {token}")
+    return {"status": "accepted"}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    body: ResetPasswordRequest, session: AsyncSession = Depends(get_session)
+) -> dict[str, str]:
+    """Set a new password given a valid reset token."""
+    try:
+        payload = decode_token(body.token)
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if payload.get("type") != "reset":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+    user = (
+        await session.execute(select(User).where(User.email == payload["sub"]))
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user.hashed_password = hash_password(body.new_password)
+    await session.commit()
+    return {"status": "ok"}
