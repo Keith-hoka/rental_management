@@ -38,6 +38,9 @@ export default function DashboardPage() {
         Welcome, {me.name} ({me.role})
       </p>
       <div className="mt-4 flex gap-3">
+        <Link href="/app/properties" className="rounded border px-3 py-1 text-blue-600">
+          Properties
+        </Link>
         <Link href="/app/change-password" className="rounded border px-3 py-1 text-blue-600">
           Change password
         </Link>
