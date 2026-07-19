@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.deps import require_roles
 from app.models import Membership, Property, Role
-from app.schemas.property import PropertyCreate, PropertyResponse
+from app.schemas.property import PropertyCreate, PropertyResponse, PropertyUpdate
 
 router = APIRouter(prefix="/api/v1/properties", tags=["properties"])
 
@@ -67,3 +67,19 @@ async def get_property(
 ) -> Property:
     """Fetch a single property in the caller's organization."""
     return await get_owned_property(property_id, membership, session)
+
+
+@router.patch("/{property_id}", response_model=PropertyResponse)
+async def update_property(
+    property_id: uuid.UUID,
+    body: PropertyUpdate,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Property:
+    """Update fields of a property in the caller's organization."""
+    prop = await get_owned_property(property_id, membership, session)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(prop, field, value)
+    await session.commit()
+    await session.refresh(prop)
+    return prop

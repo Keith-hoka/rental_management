@@ -56,3 +56,28 @@ async def test_get_property_in_other_org_is_404(client):
     created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=org_a)).json()
     response = await client.get(f"/api/v1/properties/{created['id']}", headers=org_b)
     assert response.status_code == 404
+
+
+async def test_update_property_changes_fields(client):
+    headers = await landlord_headers(client)
+    created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=headers)).json()
+    response = await client.patch(
+        f"/api/v1/properties/{created['id']}",
+        json={"status": "occupied", "bedrooms": 4},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "occupied"
+    assert body["bedrooms"] == 4
+    assert body["address"] == NEW_PROPERTY["address"]
+
+
+async def test_update_property_in_other_org_is_404(client):
+    org_a = await landlord_headers(client, "a3@example.com")
+    org_b = await landlord_headers(client, "b3@example.com")
+    created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=org_a)).json()
+    response = await client.patch(
+        f"/api/v1/properties/{created['id']}", json={"status": "occupied"}, headers=org_b
+    )
+    assert response.status_code == 404
