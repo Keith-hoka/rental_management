@@ -1,0 +1,50 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+import { clearTokens, getAccessToken } from "@/lib/auth";
+
+interface Me {
+  email: string;
+  name: string;
+  role: string;
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [me, setMe] = useState<Me | null>(null);
+
+  useEffect(() => {
+    if (!getAccessToken()) {
+      router.replace("/login");
+      return;
+    }
+    apiFetch<Me>("/api/v1/auth/me")
+      .then(setMe)
+      .catch(() => {
+        clearTokens();
+        router.replace("/login");
+      });
+  }, [router]);
+
+  if (!me) return null;
+
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <p data-testid="welcome" className="mt-2 text-gray-700">
+        Welcome, {me.name} ({me.role})
+      </p>
+      <button
+        onClick={() => {
+          clearTokens();
+          router.replace("/login");
+        }}
+        className="mt-4 rounded border px-3 py-1"
+      >
+        Log out
+      </button>
+    </main>
+  );
+}
