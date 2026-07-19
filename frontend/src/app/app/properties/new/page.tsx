@@ -30,8 +30,8 @@ export default function NewPropertyPage() {
     e.preventDefault();
     setError(null);
     try {
-      const created = await createProperty(form);
-      router.push(`/app/properties/${created.id}`);
+      await createProperty(form);
+      router.push("/app/properties");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Create failed");
     }

@@ -12,7 +12,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const [prop, setProp] = useState<Property | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -29,7 +28,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   function set<K extends keyof Property>(key: K, value: Property[K]) {
     setProp((p) => (p ? { ...p, [key]: value } : p));
-    setSaved(false);
   }
 
   async function onSave(e: React.FormEvent) {
@@ -37,7 +35,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     if (!prop) return;
     setError(null);
     try {
-      const updated = await updateProperty(id, {
+      await updateProperty(id, {
         address: prop.address,
         type: prop.type,
         bedrooms: prop.bedrooms,
@@ -46,8 +44,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         description: prop.description ?? "",
         status: prop.status,
       });
-      setProp(updated);
-      setSaved(true);
+      router.push("/app/properties");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Save failed");
     }
@@ -61,11 +58,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   return (
     <main className="mx-auto max-w-lg p-8">
       <h1 className="mb-4 text-2xl font-semibold">Edit property</h1>
-      {saved && (
-        <p data-testid="saved" className="mb-2 text-sm text-green-700">
-          Saved.
-        </p>
-      )}
       {error && (
         <p className="mb-2 text-sm text-red-600" role="alert">
           {error}
