@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -23,3 +24,17 @@ async def create_property(
     await session.commit()
     await session.refresh(prop)
     return prop
+
+
+@router.get("", response_model=list[PropertyResponse])
+async def list_properties(
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[Property]:
+    """List the caller organization's properties, newest first."""
+    result = await session.execute(
+        select(Property)
+        .where(Property.organization_id == membership.organization_id)
+        .order_by(Property.created_at.desc())
+    )
+    return list(result.scalars().all())
