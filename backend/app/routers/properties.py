@@ -1,13 +1,22 @@
 import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import require_roles
 from app.models import Membership, Property, PropertyStatus, PropertyType, Role
 from app.schemas.property import PropertyCreate, PropertyResponse, PropertyUpdate
+
+IMAGE_EXTENSIONS = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 
 router = APIRouter(prefix="/api/v1/properties", tags=["properties"])
 
@@ -102,3 +111,27 @@ async def delete_property(
     await session.delete(prop)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.post("/{property_id}/images", response_model=PropertyResponse)
+async def upload_image(
+    property_id: uuid.UUID,
+    file: UploadFile = File(...),
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Property:
+    """Upload an image for a property and append its URL to the property."""
+    prop = await get_owned_property(property_id, membership, session)
+    extension = IMAGE_EXTENSIONS.get(file.content_type or "")
+    if extension is None:
+        raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    name = f"{uuid.uuid4().hex}{extension}"
+    directory = Path(settings.upload_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / name).write_bytes(await file.read())
+
+    prop.image_urls = [*prop.image_urls, f"/uploads/{name}"]
+    await session.commit()
+    await session.refresh(prop)
+    return prop

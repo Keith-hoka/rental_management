@@ -23,5 +23,8 @@ class Settings(BaseSettings):
     email_from: str = "onboarding@resend.dev"
     frontend_url: str = "http://localhost:3000"
 
+    # Directory where uploaded property images are stored (served at /uploads).
+    upload_dir: str = "uploads"
+
 
 settings = Settings()

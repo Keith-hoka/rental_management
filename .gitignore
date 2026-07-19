@@ -4,6 +4,9 @@ __pycache__/
 .venv/
 .env
 
+# Uploaded property images (local dev storage)
+backend/uploads/
+
 # Node
 node_modules/
 .next/
