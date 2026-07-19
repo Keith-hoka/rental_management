@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 import jwt
@@ -22,6 +23,7 @@ from app.schemas.auth import (
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 def issue_tokens(user_id: str) -> TokenPair:
@@ -109,7 +111,10 @@ async def forgot_password(
             f'<p><a href="{reset_url}">Reset your password</a></p>'
             "<p>This link expires in 30 minutes. If you did not request it, ignore this email.</p>"
         )
-        await send_email(user.email, "Reset your password", html)
+        try:
+            await send_email(user.email, "Reset your password", html)
+        except Exception:
+            logger.exception("Failed to send password reset email to %s", user.email)
     return {"status": "accepted"}
 
 

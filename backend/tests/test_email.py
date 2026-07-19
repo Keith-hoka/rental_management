@@ -58,3 +58,15 @@ async def test_send_email_stub_when_no_key(monkeypatch):
     monkeypatch.setattr("httpx.AsyncClient.post", fail_post)
 
     await send_email("a@b.com", "Subject", "<p>hi</p>")
+
+
+async def test_forgot_password_accepts_even_when_send_fails(client, monkeypatch):
+    async def boom(to: str, subject: str, html: str) -> None:
+        raise RuntimeError("provider rejected the recipient")
+
+    monkeypatch.setattr("app.routers.auth.send_email", boom)
+
+    await client.post("/api/v1/auth/signup", json=SIGNUP)
+    response = await client.post("/api/v1/auth/forgot-password", json={"email": SIGNUP["email"]})
+
+    assert response.status_code == 202
