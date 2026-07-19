@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
-import { deleteProperty, getProperty, updateProperty, type Property } from "@/lib/properties";
+import {
+  deleteProperty,
+  getProperty,
+  imageSrc,
+  updateProperty,
+  uploadPropertyImage,
+  type Property,
+} from "@/lib/properties";
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -55,6 +62,17 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     router.push("/app/properties");
   }
 
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      setProp(await uploadPropertyImage(id, file));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Upload failed");
+    }
+  }
+
   return (
     <main className="mx-auto max-w-lg p-8">
       <h1 className="mb-4 text-2xl font-semibold">Edit property</h1>
@@ -63,6 +81,22 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           {error}
         </p>
       )}
+      <div className="mb-4">
+        {prop.image_urls.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {prop.image_urls.map((url) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={url}
+                src={imageSrc(url)}
+                alt="Property"
+                className="h-24 w-24 rounded object-cover"
+              />
+            ))}
+          </div>
+        )}
+        <input type="file" accept="image/*" aria-label="Upload image" onChange={onUpload} />
+      </div>
       <form onSubmit={onSave} className="space-y-3">
         <input
           required
