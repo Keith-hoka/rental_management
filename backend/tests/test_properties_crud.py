@@ -81,3 +81,21 @@ async def test_update_property_in_other_org_is_404(client):
         f"/api/v1/properties/{created['id']}", json={"status": "occupied"}, headers=org_b
     )
     assert response.status_code == 404
+
+
+async def test_delete_property_removes_it(client):
+    headers = await landlord_headers(client)
+    created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=headers)).json()
+    response = await client.delete(f"/api/v1/properties/{created['id']}", headers=headers)
+    assert response.status_code == 204
+
+    listed = await client.get("/api/v1/properties", headers=headers)
+    assert listed.json() == []
+
+
+async def test_delete_property_in_other_org_is_404(client):
+    org_a = await landlord_headers(client, "a4@example.com")
+    org_b = await landlord_headers(client, "b4@example.com")
+    created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=org_a)).json()
+    response = await client.delete(f"/api/v1/properties/{created['id']}", headers=org_b)
+    assert response.status_code == 404

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -83,3 +83,16 @@ async def update_property(
     await session.commit()
     await session.refresh(prop)
     return prop
+
+
+@router.delete("/{property_id}", status_code=204)
+async def delete_property(
+    property_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Delete a property in the caller's organization."""
+    prop = await get_owned_property(property_id, membership, session)
+    await session.delete(prop)
+    await session.commit()
+    return Response(status_code=204)
