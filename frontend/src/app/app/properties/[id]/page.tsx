@@ -19,6 +19,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const [prop, setProp] = useState<Property | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -166,7 +167,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         </button>
       </form>
       <button
-        onClick={onDelete}
+        onClick={() => setConfirming(true)}
         className="mt-3 w-full rounded border border-red-500 py-2 text-red-600 transition hover:bg-red-50"
       >
         Delete property
@@ -176,6 +177,30 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           Back to properties
         </Link>
       </p>
+
+      {confirming && (
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+            <p className="mb-4 text-gray-800">
+              Delete this property? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirming(false)}
+                className="rounded border px-3 py-1 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onDelete}
+                className="rounded bg-red-600 px-3 py-1 text-white transition hover:bg-red-700"
+              >
+                Yes, delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

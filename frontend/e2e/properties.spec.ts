@@ -33,9 +33,11 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/properties$/);
   await expect(page.getByText(/5 bed/)).toBeVisible();
 
-  // Delete it.
+  // Delete it — a confirmation popup must appear before the delete happens.
   await page.getByRole("link", { name: "42 Test Lane" }).click();
   await page.getByRole("button", { name: "Delete property" }).click();
+  await expect(page.getByText("This cannot be undone")).toBeVisible();
+  await page.getByRole("button", { name: "Yes, delete" }).click();
   await expect(page).toHaveURL(/\/app\/properties$/);
   await expect(page.getByText("42 Test Lane")).toHaveCount(0);
 });
