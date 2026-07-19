@@ -30,7 +30,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       .catch(() => setError("Property not found"));
   }, [id, router]);
 
-  if (error) return <main className="p-8 text-red-600">{error}</main>;
+  if (error && !prop) return <main className="p-8 text-red-600">{error}</main>;
   if (!prop) return null;
 
   function set<K extends keyof Property>(key: K, value: Property[K]) {
@@ -49,7 +49,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         bathrooms: prop.bathrooms,
         parking: prop.parking,
         description: prop.description ?? "",
-        status: prop.status,
       });
       router.push("/app/properties");
     } catch (err) {
@@ -81,22 +80,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           {error}
         </p>
       )}
-      <div className="mb-4">
-        {prop.image_urls.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {prop.image_urls.map((url) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={url}
-                src={imageSrc(url)}
-                alt="Property"
-                className="h-24 w-24 rounded object-cover"
-              />
-            ))}
-          </div>
-        )}
-        <input type="file" accept="image/*" aria-label="Upload image" onChange={onUpload} />
-      </div>
       <form onSubmit={onSave} className="space-y-3">
         <input
           required
@@ -105,28 +88,78 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           className="w-full rounded border px-3 py-2"
         />
         <select
-          value={prop.status}
-          onChange={(e) => set("status", e.target.value as Property["status"])}
+          value={prop.type}
+          onChange={(e) => set("type", e.target.value as Property["type"])}
           className="w-full rounded border px-3 py-2"
         >
-          <option value="vacant">Vacant</option>
-          <option value="occupied">Occupied</option>
+          <option value="house">House</option>
+          <option value="apartment">Apartment</option>
+          <option value="condo">Condo</option>
+          <option value="townhouse">Townhouse</option>
+          <option value="other">Other</option>
         </select>
         <div className="flex gap-2">
-          <input
-            type="number"
-            min={0}
-            value={prop.bedrooms}
-            onChange={(e) => set("bedrooms", Number(e.target.value))}
-            className="w-full rounded border px-3 py-2"
-          />
-          <input
-            type="number"
-            min={0}
-            value={prop.bathrooms}
-            onChange={(e) => set("bathrooms", Number(e.target.value))}
-            className="w-full rounded border px-3 py-2"
-          />
+          <label className="flex-1 text-sm text-gray-600">
+            Bedrooms
+            <input
+              type="number"
+              min={0}
+              value={prop.bedrooms}
+              onChange={(e) => set("bedrooms", Number(e.target.value))}
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+          <label className="flex-1 text-sm text-gray-600">
+            Bathrooms
+            <input
+              type="number"
+              min={0}
+              value={prop.bathrooms}
+              onChange={(e) => set("bathrooms", Number(e.target.value))}
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+          <label className="flex-1 text-sm text-gray-600">
+            Parking
+            <input
+              type="number"
+              min={0}
+              value={prop.parking}
+              onChange={(e) => set("parking", Number(e.target.value))}
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+        </div>
+        <textarea
+          placeholder="Description"
+          value={prop.description ?? ""}
+          onChange={(e) => set("description", e.target.value)}
+          className="w-full rounded border px-3 py-2"
+        />
+        <div>
+          {prop.image_urls.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {prop.image_urls.map((url) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={url}
+                  src={imageSrc(url)}
+                  alt="Property"
+                  className="h-24 w-24 rounded object-cover"
+                />
+              ))}
+            </div>
+          )}
+          <label className="inline-block cursor-pointer rounded border border-gray-300 px-3 py-2 text-sm text-blue-600 transition hover:border-blue-500 hover:bg-blue-50">
+            Upload image
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              aria-label="Upload image"
+              onChange={onUpload}
+            />
+          </label>
         </div>
         <button type="submit" className="w-full rounded bg-blue-600 py-2 text-white">
           Save
@@ -134,7 +167,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       </form>
       <button
         onClick={onDelete}
-        className="mt-3 w-full rounded border border-red-500 py-2 text-red-600"
+        className="mt-3 w-full rounded border border-red-500 py-2 text-red-600 transition hover:bg-red-50"
       >
         Delete property
       </button>

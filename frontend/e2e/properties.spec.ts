@@ -25,13 +25,13 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/properties$/);
   await expect(page.getByText("42 Test Lane")).toBeVisible();
 
-  // Open it, change the status, save — returns to the list with the update.
+  // Open it, change the bedroom count, save — returns to the list with the update.
   await page.getByRole("link", { name: "42 Test Lane" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+/);
-  await page.getByRole("combobox").first().selectOption("occupied");
+  await page.getByLabel("Bedrooms").fill("5");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/\/app\/properties$/);
-  await expect(page.getByText("house - occupied")).toBeVisible();
+  await expect(page.getByText(/5 bed/)).toBeVisible();
 
   // Delete it.
   await page.getByRole("link", { name: "42 Test Lane" }).click();

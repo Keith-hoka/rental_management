@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ApiError } from "@/lib/api";
-import { createProperty, type PropertyInput } from "@/lib/properties";
+import { createProperty, uploadPropertyImage, type PropertyInput } from "@/lib/properties";
 
 const EMPTY: PropertyInput = {
   address: "",
@@ -20,6 +20,7 @@ const EMPTY: PropertyInput = {
 export default function NewPropertyPage() {
   const router = useRouter();
   const [form, setForm] = useState<PropertyInput>(EMPTY);
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   function set<K extends keyof PropertyInput>(key: K, value: PropertyInput[K]) {
@@ -30,7 +31,10 @@ export default function NewPropertyPage() {
     e.preventDefault();
     setError(null);
     try {
-      await createProperty(form);
+      const created = await createProperty(form);
+      for (const file of files) {
+        await uploadPropertyImage(created.id, file);
+      }
       router.push("/app/properties");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Create failed");
@@ -64,40 +68,37 @@ export default function NewPropertyPage() {
           <option value="townhouse">Townhouse</option>
           <option value="other">Other</option>
         </select>
-        <select
-          aria-label="Status"
-          value={form.status}
-          onChange={(e) => set("status", e.target.value as PropertyInput["status"])}
-          className="w-full rounded border px-3 py-2"
-        >
-          <option value="vacant">Vacant</option>
-          <option value="occupied">Occupied</option>
-        </select>
         <div className="flex gap-2">
-          <input
-            type="number"
-            min={0}
-            placeholder="Bedrooms"
-            value={form.bedrooms}
-            onChange={(e) => set("bedrooms", Number(e.target.value))}
-            className="w-full rounded border px-3 py-2"
-          />
-          <input
-            type="number"
-            min={0}
-            placeholder="Bathrooms"
-            value={form.bathrooms}
-            onChange={(e) => set("bathrooms", Number(e.target.value))}
-            className="w-full rounded border px-3 py-2"
-          />
-          <input
-            type="number"
-            min={0}
-            placeholder="Parking"
-            value={form.parking}
-            onChange={(e) => set("parking", Number(e.target.value))}
-            className="w-full rounded border px-3 py-2"
-          />
+          <label className="flex-1 text-sm text-gray-600">
+            Bedrooms
+            <input
+              type="number"
+              min={0}
+              value={form.bedrooms}
+              onChange={(e) => set("bedrooms", Number(e.target.value))}
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+          <label className="flex-1 text-sm text-gray-600">
+            Bathrooms
+            <input
+              type="number"
+              min={0}
+              value={form.bathrooms}
+              onChange={(e) => set("bathrooms", Number(e.target.value))}
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+          <label className="flex-1 text-sm text-gray-600">
+            Parking
+            <input
+              type="number"
+              min={0}
+              value={form.parking}
+              onChange={(e) => set("parking", Number(e.target.value))}
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
         </div>
         <textarea
           placeholder="Description"
@@ -105,6 +106,22 @@ export default function NewPropertyPage() {
           onChange={(e) => set("description", e.target.value)}
           className="w-full rounded border px-3 py-2"
         />
+        <div>
+          <label className="inline-block cursor-pointer rounded border border-gray-300 px-3 py-2 text-sm text-blue-600 transition hover:border-blue-500 hover:bg-blue-50">
+            Upload images
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              aria-label="Upload image"
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+            />
+          </label>
+          {files.length > 0 && (
+            <p className="mt-1 text-sm text-gray-600">{files.length} image(s) selected</p>
+          )}
+        </div>
         <button type="submit" className="w-full rounded bg-blue-600 py-2 text-white">
           Create property
         </button>

@@ -54,7 +54,7 @@ export default function PropertiesPage() {
               {p.address}
             </Link>
             <span data-testid="status" className="ml-2 text-sm text-gray-600">
-              {p.type} - {p.status}
+              {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking · {p.status}
             </span>
           </li>
         ))}
