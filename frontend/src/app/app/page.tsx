@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
 
@@ -36,15 +37,20 @@ export default function DashboardPage() {
       <p data-testid="welcome" className="mt-2 text-gray-700">
         Welcome, {me.name} ({me.role})
       </p>
-      <button
-        onClick={() => {
-          clearTokens();
-          router.replace("/login");
-        }}
-        className="mt-4 rounded border px-3 py-1"
-      >
-        Log out
-      </button>
+      <div className="mt-4 flex gap-3">
+        <Link href="/app/change-password" className="rounded border px-3 py-1 text-blue-600">
+          Change password
+        </Link>
+        <button
+          onClick={() => {
+            clearTokens();
+            router.replace("/login");
+          }}
+          className="rounded border px-3 py-1"
+        >
+          Log out
+        </button>
+      </div>
     </main>
   );
 }

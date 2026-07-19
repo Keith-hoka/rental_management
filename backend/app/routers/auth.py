@@ -20,6 +20,7 @@ from app.core.security import (
 )
 from app.models import Membership, Organization, Role, User
 from app.schemas.auth import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     MeResponse,
@@ -145,6 +146,20 @@ async def reset_password(
         # The password already changed since this link was issued: the link
         # was already used, or a newer one was requested. Reject as single-use.
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user.hashed_password = hash_password(body.new_password)
+    await session.commit()
+    return {"status": "ok"}
+
+
+@router.post("/change-password")
+async def change_password(
+    body: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    """Change the authenticated user's password after verifying the current one."""
+    if not user.hashed_password or not verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
     user.hashed_password = hash_password(body.new_password)
     await session.commit()
     return {"status": "ok"}
