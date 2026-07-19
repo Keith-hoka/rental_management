@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers.auth import router as auth_router
+
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Rental Management API")
 app.add_middleware(

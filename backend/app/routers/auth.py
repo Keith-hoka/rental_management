@@ -103,7 +103,13 @@ async def forgot_password(
     ).scalar_one_or_none()
     if user:
         token = create_token(user.email, "reset", timedelta(minutes=30))
-        send_email(user.email, "Reset your password", f"Reset token: {token}")
+        reset_url = f"{settings.frontend_url}/reset-password?token={token}"
+        html = (
+            "<p>We received a request to reset your password.</p>"
+            f'<p><a href="{reset_url}">Reset your password</a></p>'
+            "<p>This link expires in 30 minutes. If you did not request it, ignore this email.</p>"
+        )
+        await send_email(user.email, "Reset your password", html)
     return {"status": "accepted"}
 
 
