@@ -133,7 +133,8 @@ export default function AllLeasesPage() {
             <input
               type="number"
               min={0}
-              value={form.rent_amount}
+              required
+              value={form.rent_amount || ""}
               onChange={(e) => set("rent_amount", Number(e.target.value))}
               className="mt-1 w-full rounded border px-3 py-2"
             />
