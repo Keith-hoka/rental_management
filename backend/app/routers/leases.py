@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.models import Lease, Membership, Role
+from app.models import Lease, Membership, Property, Role
 from app.routers.properties import get_owned_property
-from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseUpdate
+from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
 
 router = APIRouter(prefix="/api/v1", tags=["leases"])
 
@@ -133,3 +133,40 @@ async def delete_lease(
     await session.delete(lease)
     await session.commit()
     return Response(status_code=204)
+
+
+def _lease_state(lease: Lease, today: date) -> str:
+    if lease.start_date > today:
+        return "upcoming"
+    if lease.end_date < today:
+        return "ended"
+    return "active"
+
+
+@router.get("/leases", response_model=list[LeaseSummary])
+async def list_all_leases(
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[LeaseSummary]:
+    """List every lease in the caller's organization with its property address and state."""
+    today = datetime.now(UTC).date()
+    result = await session.execute(
+        select(Lease, Property.address)
+        .join(Property, Lease.property_id == Property.id)
+        .where(Lease.organization_id == membership.organization_id)
+        .order_by(Lease.created_at.desc())
+    )
+    return [
+        LeaseSummary(
+            id=lease.id,
+            property_id=lease.property_id,
+            property_address=address,
+            tenant_name=lease.tenant_name,
+            rent_amount=lease.rent_amount,
+            rent_frequency=lease.rent_frequency,
+            start_date=lease.start_date,
+            end_date=lease.end_date,
+            state=_lease_state(lease, today),
+        )
+        for lease, address in result.all()
+    ]

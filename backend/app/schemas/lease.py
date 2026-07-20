@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -43,3 +44,17 @@ class LeaseResponse(BaseModel):
     start_date: date
     end_date: date
     created_at: datetime
+
+
+class LeaseSummary(BaseModel):
+    """A lease plus its property address and derived state, for the org-wide overview."""
+
+    id: uuid.UUID
+    property_id: uuid.UUID
+    property_address: str
+    tenant_name: str
+    rent_amount: Decimal
+    rent_frequency: LeaseFrequency
+    start_date: date
+    end_date: date
+    state: Literal["active", "upcoming", "ended"]

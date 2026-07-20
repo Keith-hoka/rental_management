@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from tests.test_properties_crud import landlord_headers
 
 
@@ -235,3 +237,50 @@ async def test_delete_lease_in_other_org_is_404(client):
     ).json()
     response = await client.delete(f"/api/v1/leases/{created['id']}", headers=org_b)
     assert response.status_code == 404
+
+
+async def test_list_all_org_leases_with_address_and_state(client):
+    headers = await landlord_headers(client, "alllease@example.com")
+    today = date.today()
+    active_p = await make_property(client, headers, "Alpha St")
+    upcoming_p = await make_property(client, headers, "Beta Rd")
+    ended_p = await make_property(client, headers, "Gamma Ave")
+    await client.post(
+        f"/api/v1/properties/{active_p}/leases",
+        json=lease_body(
+            start_date=str(today - timedelta(days=1)), end_date=str(today + timedelta(days=10))
+        ),
+        headers=headers,
+    )
+    await client.post(
+        f"/api/v1/properties/{upcoming_p}/leases",
+        json=lease_body(
+            start_date=str(today + timedelta(days=5)), end_date=str(today + timedelta(days=20))
+        ),
+        headers=headers,
+    )
+    await client.post(
+        f"/api/v1/properties/{ended_p}/leases",
+        json=lease_body(
+            start_date=str(today - timedelta(days=40)), end_date=str(today - timedelta(days=20))
+        ),
+        headers=headers,
+    )
+
+    response = await client.get("/api/v1/leases", headers=headers)
+    assert response.status_code == 200
+    rows = {row["property_address"]: row for row in response.json()}
+    assert rows["Alpha St"]["state"] == "active"
+    assert rows["Beta Rd"]["state"] == "upcoming"
+    assert rows["Gamma Ave"]["state"] == "ended"
+    assert rows["Alpha St"]["tenant_name"] == "Tina Tenant"
+
+
+async def test_list_all_org_leases_is_org_scoped(client):
+    org_a = await landlord_headers(client, "aall@example.com")
+    org_b = await landlord_headers(client, "ball@example.com")
+    property_id = await make_property(client, org_a)
+    await client.post(f"/api/v1/properties/{property_id}/leases", json=lease_body(), headers=org_a)
+    response = await client.get("/api/v1/leases", headers=org_b)
+    assert response.status_code == 200
+    assert response.json() == []
