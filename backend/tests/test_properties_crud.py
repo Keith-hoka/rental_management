@@ -5,7 +5,6 @@ NEW_PROPERTY = {
     "bathrooms": 2,
     "parking": 1,
     "description": "Nice house",
-    "status": "vacant",
     "image_urls": ["http://img/1.jpg"],
 }
 
@@ -63,13 +62,13 @@ async def test_update_property_changes_fields(client):
     created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=headers)).json()
     response = await client.patch(
         f"/api/v1/properties/{created['id']}",
-        json={"status": "occupied", "bedrooms": 4},
+        json={"bedrooms": 4},
         headers=headers,
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "occupied"
     assert body["bedrooms"] == 4
+    assert body["status"] == "vacant"
     assert body["address"] == NEW_PROPERTY["address"]
 
 
@@ -78,7 +77,7 @@ async def test_update_property_in_other_org_is_404(client):
     org_b = await landlord_headers(client, "b3@example.com")
     created = (await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=org_a)).json()
     response = await client.patch(
-        f"/api/v1/properties/{created['id']}", json={"status": "occupied"}, headers=org_b
+        f"/api/v1/properties/{created['id']}", json={"bedrooms": 4}, headers=org_b
     )
     assert response.status_code == 404
 

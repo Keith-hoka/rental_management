@@ -32,8 +32,5 @@ class Property(Base):
     bathrooms: Mapped[int] = mapped_column(default=0)
     parking: Mapped[int] = mapped_column(default=0)
     description: Mapped[str | None] = mapped_column(String(2000))
-    status: Mapped[PropertyStatus] = mapped_column(
-        Enum(PropertyStatus), default=PropertyStatus.vacant
-    )
     image_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
