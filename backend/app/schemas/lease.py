@@ -1,0 +1,45 @@
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, EmailStr
+
+from app.models.lease import LeaseFrequency
+
+
+class LeaseCreate(BaseModel):
+    tenant_name: str
+    tenant_email: EmailStr
+    rent_amount: Decimal
+    rent_frequency: LeaseFrequency
+    bond_amount: Decimal | None = None
+    notice_period_days: int | None = None
+    start_date: date
+    end_date: date
+
+
+class LeaseUpdate(BaseModel):
+    tenant_name: str | None = None
+    tenant_email: EmailStr | None = None
+    rent_amount: Decimal | None = None
+    rent_frequency: LeaseFrequency | None = None
+    bond_amount: Decimal | None = None
+    notice_period_days: int | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+
+
+class LeaseResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    property_id: uuid.UUID
+    tenant_name: str
+    tenant_email: EmailStr
+    rent_amount: Decimal
+    rent_frequency: LeaseFrequency
+    bond_amount: Decimal | None
+    notice_period_days: int | None
+    start_date: date
+    end_date: date
+    created_at: datetime
