@@ -41,6 +41,9 @@ export default function DashboardPage() {
         <Link href="/app/properties" className="rounded border px-3 py-1 text-blue-600">
           Properties
         </Link>
+        <Link href="/app/team" className="rounded border px-3 py-1 text-blue-600">
+          Team
+        </Link>
         <Link href="/app/change-password" className="rounded border px-3 py-1 text-blue-600">
           Change password
         </Link>
