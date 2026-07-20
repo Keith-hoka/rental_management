@@ -98,3 +98,55 @@ async def test_create_lease_allows_adjacent_ranges(client):
         headers=headers,
     )
     assert adjacent.status_code == 201
+
+
+async def test_list_leases_for_property(client):
+    headers = await landlord_headers(client, "list@example.com")
+    property_id = await make_property(client, headers)
+    await client.post(
+        f"/api/v1/properties/{property_id}/leases",
+        json=lease_body(start_date="2026-01-01", end_date="2026-06-30"),
+        headers=headers,
+    )
+    await client.post(
+        f"/api/v1/properties/{property_id}/leases",
+        json=lease_body(start_date="2026-07-01", end_date="2026-12-31"),
+        headers=headers,
+    )
+    response = await client.get(f"/api/v1/properties/{property_id}/leases", headers=headers)
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+async def test_list_leases_for_other_org_property_is_404(client):
+    org_a = await landlord_headers(client, "la@example.com")
+    org_b = await landlord_headers(client, "lb@example.com")
+    property_id = await make_property(client, org_a)
+    response = await client.get(f"/api/v1/properties/{property_id}/leases", headers=org_b)
+    assert response.status_code == 404
+
+
+async def test_get_lease_returns_it(client):
+    headers = await landlord_headers(client, "getlease@example.com")
+    property_id = await make_property(client, headers)
+    created = (
+        await client.post(
+            f"/api/v1/properties/{property_id}/leases", json=lease_body(), headers=headers
+        )
+    ).json()
+    response = await client.get(f"/api/v1/leases/{created['id']}", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["id"] == created["id"]
+
+
+async def test_get_lease_in_other_org_is_404(client):
+    org_a = await landlord_headers(client, "ga@example.com")
+    org_b = await landlord_headers(client, "gb@example.com")
+    property_id = await make_property(client, org_a)
+    created = (
+        await client.post(
+            f"/api/v1/properties/{property_id}/leases", json=lease_body(), headers=org_a
+        )
+    ).json()
+    response = await client.get(f"/api/v1/leases/{created['id']}", headers=org_b)
+    assert response.status_code == 404

@@ -55,3 +55,44 @@ async def create_lease(
     await session.commit()
     await session.refresh(lease)
     return lease
+
+
+async def get_owned_lease(
+    lease_id: uuid.UUID, membership: Membership, session: AsyncSession
+) -> Lease:
+    """Fetch a lease in the caller's org, or raise 404."""
+    lease = (
+        await session.execute(
+            select(Lease).where(
+                Lease.id == lease_id,
+                Lease.organization_id == membership.organization_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if lease is None:
+        raise HTTPException(status_code=404, detail="Lease not found")
+    return lease
+
+
+@router.get("/properties/{property_id}/leases", response_model=list[LeaseResponse])
+async def list_leases(
+    property_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[Lease]:
+    """List a property's leases (newest first). 404 if the property is not in the org."""
+    await get_owned_property(property_id, membership, session)
+    result = await session.execute(
+        select(Lease).where(Lease.property_id == property_id).order_by(Lease.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/leases/{lease_id}", response_model=LeaseResponse)
+async def get_lease(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Lease:
+    """Fetch a single lease in the caller's organization."""
+    return await get_owned_lease(lease_id, membership, session)
