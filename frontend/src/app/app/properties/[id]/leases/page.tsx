@@ -6,7 +6,6 @@ import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import {
-  createLease,
   deleteLease,
   listLeases,
   updateLease,
@@ -14,23 +13,12 @@ import {
   type LeaseInput,
 } from "@/lib/leases";
 
-const EMPTY: LeaseInput = {
-  tenant_name: "",
-  tenant_email: "",
-  rent_amount: 0,
-  rent_frequency: "monthly",
-  bond_amount: null,
-  notice_period_days: null,
-  start_date: "",
-  end_date: "",
-};
-
 export default function LeasesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [leases, setLeases] = useState<Lease[]>([]);
-  const [form, setForm] = useState<LeaseInput>(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<LeaseInput | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,37 +26,25 @@ export default function LeasesPage({ params }: { params: Promise<{ id: string }>
       router.replace("/login");
       return;
     }
+    let active = true;
     listLeases(id)
-      .then(setLeases)
-      .catch(() => setLeases([]));
+      .then((l) => {
+        if (active) setLeases(l);
+      })
+      .catch(() => {
+        if (active) setLeases([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [id, router]);
 
   function set<K extends keyof LeaseInput>(key: K, value: LeaseInput[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  async function refresh() {
-    setLeases(await listLeases(id));
-  }
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      if (editingId) {
-        await updateLease(editingId, form);
-      } else {
-        await createLease(id, form);
-      }
-      setForm(EMPTY);
-      setEditingId(null);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Save failed");
-    }
+    setForm((f) => (f ? { ...f, [key]: value } : f));
   }
 
   function startEdit(lease: Lease) {
+    setError(null);
     setEditingId(lease.id);
     setForm({
       tenant_name: lease.tenant_name,
@@ -82,89 +58,123 @@ export default function LeasesPage({ params }: { params: Promise<{ id: string }>
     });
   }
 
+  function cancelEdit() {
+    setEditingId(null);
+    setForm(null);
+    setError(null);
+  }
+
+  async function onSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingId || !form) return;
+    setError(null);
+    try {
+      await updateLease(editingId, form);
+      cancelEdit();
+      setLeases(await listLeases(id));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Save failed");
+    }
+  }
+
   async function onDelete(leaseId: string) {
     await deleteLease(leaseId);
-    if (editingId === leaseId) {
-      setEditingId(null);
-      setForm(EMPTY);
-    }
-    await refresh();
+    if (editingId === leaseId) cancelEdit();
+    setLeases(await listLeases(id));
   }
 
   return (
     <main className="mx-auto max-w-lg p-8">
       <h1 className="mb-4 text-2xl font-semibold">Leases</h1>
+      <p className="mb-4 text-sm text-gray-600">
+        Edit or remove this property&apos;s leases. Add new leases from the{" "}
+        <Link href="/app/leases" className="text-blue-600">
+          Leases page
+        </Link>
+        .
+      </p>
       {error && (
         <p className="mb-2 text-sm text-red-600" role="alert">
           {error}
         </p>
       )}
-      <form onSubmit={onSubmit} className="mb-6 space-y-3">
-        <input
-          required
-          placeholder="Tenant name"
-          value={form.tenant_name}
-          onChange={(e) => set("tenant_name", e.target.value)}
-          className="w-full rounded border px-3 py-2"
-        />
-        <input
-          type="email"
-          required
-          placeholder="Tenant email"
-          value={form.tenant_email}
-          onChange={(e) => set("tenant_email", e.target.value)}
-          className="w-full rounded border px-3 py-2"
-        />
-        <div className="flex gap-2">
-          <label className="flex-1 text-sm text-gray-600">
-            Rent
-            <input
-              type="number"
-              min={0}
-              value={form.rent_amount}
-              onChange={(e) => set("rent_amount", Number(e.target.value))}
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </label>
-          <label className="flex-1 text-sm text-gray-600">
-            Frequency
-            <select
-              value={form.rent_frequency}
-              onChange={(e) => set("rent_frequency", e.target.value as LeaseInput["rent_frequency"])}
-              className="mt-1 w-full rounded border px-3 py-2"
+      {editingId && form && (
+        <form onSubmit={onSave} className="mb-6 space-y-3">
+          <input
+            required
+            placeholder="Tenant name"
+            value={form.tenant_name}
+            onChange={(e) => set("tenant_name", e.target.value)}
+            className="w-full rounded border px-3 py-2"
+          />
+          <input
+            type="email"
+            required
+            placeholder="Tenant email"
+            value={form.tenant_email}
+            onChange={(e) => set("tenant_email", e.target.value)}
+            className="w-full rounded border px-3 py-2"
+          />
+          <div className="flex gap-2">
+            <label className="flex-1 text-sm text-gray-600">
+              Rent
+              <input
+                type="number"
+                min={0}
+                value={form.rent_amount}
+                onChange={(e) => set("rent_amount", Number(e.target.value))}
+                className="mt-1 w-full rounded border px-3 py-2"
+              />
+            </label>
+            <label className="flex-1 text-sm text-gray-600">
+              Frequency
+              <select
+                value={form.rent_frequency}
+                onChange={(e) => set("rent_frequency", e.target.value as LeaseInput["rent_frequency"])}
+                className="mt-1 w-full rounded border px-3 py-2"
+              >
+                <option value="weekly">Weekly</option>
+                <option value="fortnightly">Fortnightly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <label className="flex-1 text-sm text-gray-600">
+              Start
+              <input
+                type="date"
+                required
+                value={form.start_date}
+                onChange={(e) => set("start_date", e.target.value)}
+                className="mt-1 w-full rounded border px-3 py-2"
+              />
+            </label>
+            <label className="flex-1 text-sm text-gray-600">
+              End
+              <input
+                type="date"
+                required
+                value={form.end_date}
+                onChange={(e) => set("end_date", e.target.value)}
+                className="mt-1 w-full rounded border px-3 py-2"
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="flex-1 rounded bg-blue-600 py-2 text-white">
+              Save lease
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="flex-1 rounded border py-2 transition hover:bg-gray-50"
             >
-              <option value="weekly">Weekly</option>
-              <option value="fortnightly">Fortnightly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </label>
-        </div>
-        <div className="flex gap-2">
-          <label className="flex-1 text-sm text-gray-600">
-            Start
-            <input
-              type="date"
-              required
-              value={form.start_date}
-              onChange={(e) => set("start_date", e.target.value)}
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </label>
-          <label className="flex-1 text-sm text-gray-600">
-            End
-            <input
-              type="date"
-              required
-              value={form.end_date}
-              onChange={(e) => set("end_date", e.target.value)}
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </label>
-        </div>
-        <button type="submit" className="w-full rounded bg-blue-600 py-2 text-white">
-          {editingId ? "Save lease" : "Add lease"}
-        </button>
-      </form>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
       <ul className="space-y-2">
         {leases.map((lease) => (
           <li key={lease.id} className="flex items-center justify-between rounded border p-3">
