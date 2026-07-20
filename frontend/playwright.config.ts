@@ -8,7 +8,11 @@ export default defineConfig({
   // The extra retry is a cheap safety net for unrelated CI hiccups.
   workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
-  use: { baseURL: "http://localhost:3000" },
+  use: {
+    baseURL: "http://localhost:3000",
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+  },
   webServer: {
     command: "npm run dev",
     url: "http://localhost:3000",
