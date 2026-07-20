@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +9,7 @@ from app.core.db import get_session
 from app.core.deps import require_roles
 from app.models import Lease, Membership, Role
 from app.routers.properties import get_owned_property
-from app.schemas.lease import LeaseCreate, LeaseResponse
+from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseUpdate
 
 router = APIRouter(prefix="/api/v1", tags=["leases"])
 
@@ -96,3 +96,40 @@ async def get_lease(
 ) -> Lease:
     """Fetch a single lease in the caller's organization."""
     return await get_owned_lease(lease_id, membership, session)
+
+
+@router.patch("/leases/{lease_id}", response_model=LeaseResponse)
+async def update_lease(
+    lease_id: uuid.UUID,
+    body: LeaseUpdate,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Lease:
+    """Update a lease; re-validate date order and overlap (excluding itself)."""
+    lease = await get_owned_lease(lease_id, membership, session)
+    data = body.model_dump(exclude_unset=True)
+    start = data.get("start_date", lease.start_date)
+    end = data.get("end_date", lease.end_date)
+    if start > end:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date")
+    if await overlapping_lease_exists(session, lease.property_id, start, end, exclude_id=lease.id):
+        raise HTTPException(status_code=409, detail="Lease dates overlap an existing lease")
+
+    for field, value in data.items():
+        setattr(lease, field, value)
+    await session.commit()
+    await session.refresh(lease)
+    return lease
+
+
+@router.delete("/leases/{lease_id}", status_code=204)
+async def delete_lease(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Delete a lease in the caller's organization."""
+    lease = await get_owned_lease(lease_id, membership, session)
+    await session.delete(lease)
+    await session.commit()
+    return Response(status_code=204)
