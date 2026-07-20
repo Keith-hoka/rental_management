@@ -7,6 +7,16 @@ from app.core.db import Base, get_session
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def disable_real_email(monkeypatch):
+    """Route send_email onto its log-stub branch so tests never call Resend.
+
+    Tests that specifically exercise the Resend branch set their own key,
+    which overrides this within the test.
+    """
+    monkeypatch.setattr(settings, "resend_api_key", None)
+
+
 @pytest.fixture
 async def engine():
     engine = create_async_engine(settings.test_database_url)
