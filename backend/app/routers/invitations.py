@@ -11,8 +11,15 @@ from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import require_roles
 from app.core.email import send_email
-from app.models import Invitation, InvitationStatus, Membership, Role
-from app.schemas.invitation import InvitationCreate, InvitationResponse
+from app.core.security import hash_password
+from app.models import Invitation, InvitationStatus, Membership, Role, User
+from app.routers.auth import issue_tokens
+from app.schemas.auth import TokenPair
+from app.schemas.invitation import (
+    AcceptInvitationRequest,
+    InvitationCreate,
+    InvitationResponse,
+)
 
 router = APIRouter(prefix="/api/v1/invitations", tags=["invitations"])
 
@@ -90,3 +97,35 @@ async def revoke_invitation(
     invite.status = InvitationStatus.revoked
     await session.commit()
     return Response(status_code=204)
+
+
+@router.post("/accept", status_code=201, response_model=TokenPair)
+async def accept_invitation(
+    body: AcceptInvitationRequest, session: AsyncSession = Depends(get_session)
+) -> TokenPair:
+    """Accept an invitation: create the user + membership and log them in."""
+    invite = (
+        await session.execute(select(Invitation).where(Invitation.token == body.token))
+    ).scalar_one_or_none()
+    if (
+        invite is None
+        or invite.status != InvitationStatus.pending
+        or invite.expires_at < datetime.now(UTC)
+    ):
+        raise HTTPException(status_code=400, detail="Invalid or expired invitation")
+
+    existing = (
+        await session.execute(select(User).where(User.email == invite.email))
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    user = User(email=invite.email, hashed_password=hash_password(body.password), name=body.name)
+    session.add(user)
+    await session.flush()
+    session.add(
+        Membership(user_id=user.id, organization_id=invite.organization_id, role=invite.role)
+    )
+    invite.status = InvitationStatus.accepted
+    await session.commit()
+    return issue_tokens(str(user.id))
