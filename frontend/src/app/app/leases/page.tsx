@@ -182,10 +182,7 @@ export default function AllLeasesPage() {
         {leases.map((lease) => (
           <li key={lease.id} className="flex items-center justify-between rounded border p-3">
             <span className="text-sm">
-              <Link
-                href={`/app/properties/${lease.property_id}/leases`}
-                className="font-medium text-blue-600"
-              >
+              <Link href={`/app/leases/${lease.id}`} className="font-medium text-blue-600">
                 {lease.property_address}
               </Link>
               <span className="text-gray-600">

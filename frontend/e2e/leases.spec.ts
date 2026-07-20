@@ -46,11 +46,14 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await expect(page.getByText("Occupied")).toBeVisible();
   await expect(page.getByText("Tina Tenant", { exact: false })).toBeVisible();
 
-  // Delete the lease from the leases overview's per-property link.
+  // Open the lease from the overview — its detail page shows the tenant info —
+  // and delete it there.
   await page.goto("/app/leases");
   await page.getByRole("link", { name: "7 Lease Way" }).click();
-  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
+  await expect(page).toHaveURL(/\/app\/leases\/[0-9a-f-]+$/);
+  await expect(page.getByText("tina@example.com")).toBeVisible();
   await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page).toHaveURL(/\/app\/leases$/);
   await expect(page.getByText("No leases yet.")).toBeVisible();
 
   // Property is vacant again.
