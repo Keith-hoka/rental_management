@@ -8,7 +8,9 @@ function isoDate(offsetDays: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-test("adding a lease makes a property occupied, deleting it makes it vacant", async ({ page }) => {
+test("adding a lease from the leases page makes a property occupied, deleting it makes it vacant", async ({
+  page,
+}) => {
   await page.goto("/signup");
   await page.getByPlaceholder("Your name").fill("Lease Landlord");
   await page.getByPlaceholder("Organization name").fill("Lease Org");
@@ -24,13 +26,11 @@ test("adding a lease makes a property occupied, deleting it makes it vacant", as
   await page.getByRole("button", { name: "Create property" }).click();
   await expect(page).toHaveURL(/\/app\/properties$/);
 
-  // Open it — starts vacant — and go to lease management.
-  await page.getByRole("link", { name: "7 Lease Way" }).click();
-  await expect(page.getByText("Vacant — no active lease.")).toBeVisible();
-  await page.getByRole("link", { name: "Manage leases" }).click();
-  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
-
-  // Add a lease covering today.
+  // Add a lease from the leases page, selecting the property from the dropdown.
+  await page.goto("/app");
+  await page.getByRole("link", { name: "Leases" }).click();
+  await expect(page).toHaveURL(/\/app\/leases$/);
+  await page.getByLabel("Property").selectOption({ label: "7 Lease Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Tina Tenant");
   await page.getByPlaceholder("Tenant email").fill("tina@example.com");
   await page.getByLabel("Rent").fill("1500");
@@ -39,16 +39,23 @@ test("adding a lease makes a property occupied, deleting it makes it vacant", as
   await page.getByRole("button", { name: "Add lease" }).click();
   await expect(page.getByText("Tina Tenant", { exact: false })).toBeVisible();
 
-  // Property detail now shows occupied.
-  await page.getByRole("link", { name: "Back to property" }).click();
+  // The property is now occupied (derived from the active lease).
+  await page.goto("/app/properties");
+  await page.getByRole("link", { name: "7 Lease Way" }).click();
+  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+$/);
   await expect(page.getByText("Occupied")).toBeVisible();
   await expect(page.getByText("Tina Tenant", { exact: false })).toBeVisible();
 
-  // Delete the lease -> vacant again.
-  await page.getByRole("link", { name: "Manage leases" }).click();
+  // Delete the lease from the leases overview's per-property link.
+  await page.goto("/app/leases");
+  await page.getByRole("link", { name: "7 Lease Way" }).click();
+  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("No leases yet.")).toBeVisible();
-  await page.getByRole("link", { name: "Back to property" }).click();
+
+  // Property is vacant again.
+  await page.goto("/app/properties");
+  await page.getByRole("link", { name: "7 Lease Way" }).click();
   await expect(page.getByText("Vacant — no active lease.")).toBeVisible();
 });
 
@@ -70,21 +77,23 @@ test("leases are reachable from the dashboard and the properties list", async ({
   await page.getByRole("button", { name: "Create property" }).click();
   await expect(page).toHaveURL(/\/app\/properties$/);
 
-  // Per-row "Leases" shortcut on the properties list jumps straight to lease management.
+  // Add a lease from the dashboard leases page.
+  await page.goto("/app");
   await page.getByRole("link", { name: "Leases" }).click();
-  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
+  await expect(page).toHaveURL(/\/app\/leases$/);
+  await page.getByLabel("Property").selectOption({ label: "9 Overview Ave (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Nav Tenant");
   await page.getByPlaceholder("Tenant email").fill("nav@example.com");
   await page.getByLabel("Rent").fill("1200");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(20));
   await page.getByRole("button", { name: "Add lease" }).click();
-  await expect(page.getByText("Nav Tenant", { exact: false })).toBeVisible();
-
-  // Dashboard "Leases" opens the org-wide overview listing the lease as active.
-  await page.goto("/app");
-  await page.getByRole("link", { name: "Leases" }).click();
-  await expect(page).toHaveURL(/\/app\/leases$/);
-  await expect(page.getByText("9 Overview Ave")).toBeVisible();
+  // The new lease shows in the overview list as active.
+  await expect(page.getByRole("link", { name: "9 Overview Ave" })).toBeVisible();
   await expect(page.getByText("active")).toBeVisible();
+
+  // The properties list offers a per-row shortcut to that property's leases.
+  await page.goto("/app/properties");
+  await page.getByRole("link", { name: "Leases" }).click();
+  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
 });

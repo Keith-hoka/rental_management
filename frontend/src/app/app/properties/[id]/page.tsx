@@ -103,11 +103,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       ) : (
         <p className="mb-4 text-sm text-gray-600">Vacant — no active lease.</p>
       )}
-      <p className="mb-4">
-        <Link href={`/app/properties/${id}/leases`} className="text-blue-600">
-          Manage leases
-        </Link>
-      </p>
       <form onSubmit={onSave} className="space-y-3">
         <input
           required
