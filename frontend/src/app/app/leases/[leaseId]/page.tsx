@@ -31,6 +31,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<LeaseInput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -237,7 +238,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
               Edit
             </button>
             <button
-              onClick={onDelete}
+              onClick={() => setConfirming(true)}
               className="flex-1 rounded border border-red-500 px-3 py-2 text-red-600 transition hover:bg-red-50"
             >
               Delete
@@ -251,6 +252,28 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
           Back to all leases
         </Link>
       </p>
+
+      {confirming && (
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+            <p className="mb-4 text-gray-800">Delete this lease? This cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirming(false)}
+                className="rounded border px-3 py-1 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onDelete}
+                className="rounded bg-red-600 px-3 py-1 text-white transition hover:bg-red-700"
+              >
+                Yes, delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
