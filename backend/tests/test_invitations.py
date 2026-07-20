@@ -42,3 +42,52 @@ async def test_create_invitation_rejects_tenant_role(client):
         headers=headers,
     )
     assert response.status_code == 422
+
+
+async def test_list_invitations_is_org_scoped(client):
+    org_a = await landlord_headers(client, "a@example.com")
+    org_b = await landlord_headers(client, "b@example.com")
+    await client.post(
+        "/api/v1/invitations",
+        json={"email": "pm@example.com", "role": "property_manager"},
+        headers=org_a,
+    )
+
+    b_list = await client.get("/api/v1/invitations", headers=org_b)
+    assert b_list.status_code == 200
+    assert b_list.json() == []
+
+    a_list = await client.get("/api/v1/invitations", headers=org_a)
+    assert len(a_list.json()) == 1
+
+
+async def test_revoke_invitation_removes_it_from_list(client):
+    headers = await landlord_headers(client, "revoker@example.com")
+    created = (
+        await client.post(
+            "/api/v1/invitations",
+            json={"email": "pm@example.com", "role": "property_manager"},
+            headers=headers,
+        )
+    ).json()
+
+    revoked = await client.delete(f"/api/v1/invitations/{created['id']}", headers=headers)
+    assert revoked.status_code == 204
+
+    listed = await client.get("/api/v1/invitations", headers=headers)
+    assert listed.json() == []
+
+
+async def test_revoke_invitation_in_other_org_is_404(client):
+    org_a = await landlord_headers(client, "a5@example.com")
+    org_b = await landlord_headers(client, "b5@example.com")
+    created = (
+        await client.post(
+            "/api/v1/invitations",
+            json={"email": "pm@example.com", "role": "property_manager"},
+            headers=org_a,
+        )
+    ).json()
+
+    response = await client.delete(f"/api/v1/invitations/{created['id']}", headers=org_b)
+    assert response.status_code == 404

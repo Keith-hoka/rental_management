@@ -1,15 +1,17 @@
 import logging
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import require_roles
 from app.core.email import send_email
-from app.models import Invitation, Membership, Role
+from app.models import Invitation, InvitationStatus, Membership, Role
 from app.schemas.invitation import InvitationCreate, InvitationResponse
 
 router = APIRouter(prefix="/api/v1/invitations", tags=["invitations"])
@@ -49,3 +51,42 @@ async def create_invitation(
         logging.getLogger(__name__).exception("Failed to send invite email to %s", invite.email)
 
     return invite
+
+
+@router.get("", response_model=list[InvitationResponse])
+async def list_invitations(
+    membership: Membership = Depends(landlord_only),
+    session: AsyncSession = Depends(get_session),
+) -> list[Invitation]:
+    """List pending invitations for the caller's organization, newest first."""
+    result = await session.execute(
+        select(Invitation)
+        .where(
+            Invitation.organization_id == membership.organization_id,
+            Invitation.status == InvitationStatus.pending,
+        )
+        .order_by(Invitation.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.delete("/{invitation_id}", status_code=204)
+async def revoke_invitation(
+    invitation_id: uuid.UUID,
+    membership: Membership = Depends(landlord_only),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Revoke a pending invitation in the caller's organization."""
+    invite = (
+        await session.execute(
+            select(Invitation).where(
+                Invitation.id == invitation_id,
+                Invitation.organization_id == membership.organization_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if invite is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    invite.status = InvitationStatus.revoked
+    await session.commit()
+    return Response(status_code=204)
