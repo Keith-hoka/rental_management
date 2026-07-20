@@ -26,9 +26,17 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       router.replace("/login");
       return;
     }
+    let active = true;
     getProperty(id)
-      .then(setProp)
-      .catch(() => setError("Property not found"));
+      .then((p) => {
+        if (active) setProp(p);
+      })
+      .catch(() => {
+        if (active) setError("Property not found");
+      });
+    return () => {
+      active = false;
+    };
   }, [id, router]);
 
   if (error && !prop) return <main className="p-8 text-red-600">{error}</main>;

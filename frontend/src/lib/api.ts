@@ -14,6 +14,9 @@ export class ApiError extends Error {
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   const response = await fetch(`${BASE_URL}${path}`, {
+    // Always hit the network: authenticated data must reflect the latest
+    // mutations, never a cached GET response.
+    cache: "no-store",
     ...options,
     headers: {
       "Content-Type": "application/json",
