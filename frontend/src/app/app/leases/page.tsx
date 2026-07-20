@@ -153,6 +153,32 @@ export default function AllLeasesPage() {
         </div>
         <div className="flex gap-2">
           <label className="flex-1 text-sm text-gray-600">
+            Bond (optional)
+            <input
+              type="number"
+              min={0}
+              value={form.bond_amount ?? ""}
+              onChange={(e) =>
+                set("bond_amount", e.target.value === "" ? null : Number(e.target.value))
+              }
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+          <label className="flex-1 text-sm text-gray-600">
+            Notice period (days)
+            <input
+              type="number"
+              min={0}
+              value={form.notice_period_days ?? ""}
+              onChange={(e) =>
+                set("notice_period_days", e.target.value === "" ? null : Number(e.target.value))
+              }
+              className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+        </div>
+        <div className="flex gap-2">
+          <label className="flex-1 text-sm text-gray-600">
             Start
             <input
               type="date"

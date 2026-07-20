@@ -96,7 +96,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
 
   return (
     <main className="mx-auto max-w-lg p-8">
-      <h1 className="mb-4 text-2xl font-semibold">Lease</h1>
+      <h1 className="mb-4 text-2xl font-semibold">{editing ? "Edit lease" : "Lease"}</h1>
       {error && (
         <p className="mb-2 text-sm text-red-600" role="alert">
           {error}
@@ -142,6 +142,32 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                 <option value="fortnightly">Fortnightly</option>
                 <option value="monthly">Monthly</option>
               </select>
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <label className="flex-1 text-sm text-gray-600">
+              Bond (optional)
+              <input
+                type="number"
+                min={0}
+                value={form.bond_amount ?? ""}
+                onChange={(e) =>
+                  set("bond_amount", e.target.value === "" ? null : Number(e.target.value))
+                }
+                className="mt-1 w-full rounded border px-3 py-2"
+              />
+            </label>
+            <label className="flex-1 text-sm text-gray-600">
+              Notice period (days)
+              <input
+                type="number"
+                min={0}
+                value={form.notice_period_days ?? ""}
+                onChange={(e) =>
+                  set("notice_period_days", e.target.value === "" ? null : Number(e.target.value))
+                }
+                className="mt-1 w-full rounded border px-3 py-2"
+              />
             </label>
           </div>
           <div className="flex gap-2">

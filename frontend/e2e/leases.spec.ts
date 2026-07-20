@@ -34,6 +34,8 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await page.getByPlaceholder("Tenant name").fill("Tina Tenant");
   await page.getByPlaceholder("Tenant email").fill("tina@example.com");
   await page.getByLabel("Rent").fill("1500");
+  await page.getByLabel("Bond (optional)").fill("3000");
+  await page.getByLabel("Notice period (days)").fill("21");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(30));
   await page.getByRole("button", { name: "Add lease" }).click();
@@ -52,6 +54,8 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await page.getByRole("link", { name: "7 Lease Way" }).click();
   await expect(page).toHaveURL(/\/app\/leases\/[0-9a-f-]+$/);
   await expect(page.getByText("tina@example.com")).toBeVisible();
+  await expect(page.getByText(/\$3000/)).toBeVisible();
+  await expect(page.getByText("21 days")).toBeVisible();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page).toHaveURL(/\/app\/leases$/);
   await expect(page.getByText("No leases yet.")).toBeVisible();
