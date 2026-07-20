@@ -13,7 +13,6 @@ const EMPTY: PropertyInput = {
   bathrooms: 1,
   parking: 0,
   description: "",
-  status: "vacant",
   image_urls: [],
 };
 

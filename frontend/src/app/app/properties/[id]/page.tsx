@@ -81,6 +81,25 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           {error}
         </p>
       )}
+      {prop.active_lease ? (
+        <div className="mb-4 rounded border border-green-500 bg-green-50 p-3 text-sm">
+          <p className="font-semibold text-green-800">Occupied</p>
+          <p className="text-gray-700">
+            {prop.active_lease.tenant_name} · ${prop.active_lease.rent_amount}/
+            {prop.active_lease.rent_frequency}
+          </p>
+          <p className="text-gray-600">
+            {prop.active_lease.start_date} to {prop.active_lease.end_date}
+          </p>
+        </div>
+      ) : (
+        <p className="mb-4 text-sm text-gray-600">Vacant — no active lease.</p>
+      )}
+      <p className="mb-4">
+        <Link href={`/app/properties/${id}/leases`} className="text-blue-600">
+          Manage leases
+        </Link>
+      </p>
       <form onSubmit={onSave} className="space-y-3">
         <input
           required

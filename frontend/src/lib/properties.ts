@@ -3,6 +3,15 @@ import { apiFetch, API_BASE_URL, ApiError } from "@/lib/api";
 export type PropertyStatus = "vacant" | "occupied";
 export type PropertyType = "apartment" | "house" | "condo" | "townhouse" | "other";
 
+export interface ActiveLease {
+  id: string;
+  tenant_name: string;
+  rent_amount: number;
+  rent_frequency: "weekly" | "fortnightly" | "monthly";
+  start_date: string;
+  end_date: string;
+}
+
 export interface Property {
   id: string;
   organization_id: string;
@@ -14,6 +23,7 @@ export interface Property {
   description: string | null;
   status: PropertyStatus;
   image_urls: string[];
+  active_lease: ActiveLease | null;
 }
 
 export interface PropertyInput {
@@ -23,7 +33,6 @@ export interface PropertyInput {
   bathrooms: number;
   parking: number;
   description: string;
-  status: PropertyStatus;
   image_urls: string[];
 }
 
