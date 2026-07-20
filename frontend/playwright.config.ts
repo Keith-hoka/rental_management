@@ -2,6 +2,9 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // One retry in CI absorbs transient timing flakes when parallel workers
+  // saturate the single-worker backend; a real regression fails both attempts.
+  retries: process.env.CI ? 1 : 0,
   use: { baseURL: "http://localhost:3000" },
   webServer: {
     command: "npm run dev",

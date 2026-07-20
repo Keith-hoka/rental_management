@@ -49,13 +49,21 @@ export default function PropertiesPage() {
       </div>
       <ul className="space-y-2">
         {properties.map((p) => (
-          <li key={p.id} className="rounded border p-3">
-            <Link href={`/app/properties/${p.id}`} className="text-blue-600">
-              {p.address}
-            </Link>
-            <span data-testid="status" className="ml-2 text-sm text-gray-600">
-              {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking · {p.status}
+          <li key={p.id} className="flex items-center justify-between rounded border p-3">
+            <span>
+              <Link href={`/app/properties/${p.id}`} className="text-blue-600">
+                {p.address}
+              </Link>
+              <span data-testid="status" className="ml-2 text-sm text-gray-600">
+                {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking · {p.status}
+              </span>
             </span>
+            <Link
+              href={`/app/properties/${p.id}/leases`}
+              className="ml-2 shrink-0 text-sm text-blue-600"
+            >
+              Leases
+            </Link>
           </li>
         ))}
         {properties.length === 0 && <li className="text-gray-500">No properties yet.</li>}

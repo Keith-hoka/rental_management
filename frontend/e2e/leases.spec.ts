@@ -51,3 +51,40 @@ test("adding a lease makes a property occupied, deleting it makes it vacant", as
   await page.getByRole("link", { name: "Back to property" }).click();
   await expect(page.getByText("Vacant — no active lease.")).toBeVisible();
 });
+
+const navOwner = `lease-nav-${Date.now()}@example.com`;
+
+test("leases are reachable from the dashboard and the properties list", async ({ page }) => {
+  await page.goto("/signup");
+  await page.getByPlaceholder("Your name").fill("Nav Landlord");
+  await page.getByPlaceholder("Organization name").fill("Nav Org");
+  await page.getByPlaceholder("Email").fill(navOwner);
+  await page.getByPlaceholder("Password (min 8 chars)").fill("secret123");
+  await page.getByRole("button", { name: "Sign up" }).click();
+  await expect(page.getByTestId("welcome")).toBeVisible();
+
+  // Create a property.
+  await page.getByRole("link", { name: "Properties" }).click();
+  await page.getByRole("link", { name: "New property" }).click();
+  await page.getByPlaceholder("Address", { exact: true }).fill("9 Overview Ave");
+  await page.getByRole("button", { name: "Create property" }).click();
+  await expect(page).toHaveURL(/\/app\/properties$/);
+
+  // Per-row "Leases" shortcut on the properties list jumps straight to lease management.
+  await page.getByRole("link", { name: "Leases" }).click();
+  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
+  await page.getByPlaceholder("Tenant name").fill("Nav Tenant");
+  await page.getByPlaceholder("Tenant email").fill("nav@example.com");
+  await page.getByLabel("Rent").fill("1200");
+  await page.getByLabel("Start").fill(isoDate(-1));
+  await page.getByLabel("End").fill(isoDate(20));
+  await page.getByRole("button", { name: "Add lease" }).click();
+  await expect(page.getByText("Nav Tenant", { exact: false })).toBeVisible();
+
+  // Dashboard "Leases" opens the org-wide overview listing the lease as active.
+  await page.goto("/app");
+  await page.getByRole("link", { name: "Leases" }).click();
+  await expect(page).toHaveURL(/\/app\/leases$/);
+  await expect(page.getByText("9 Overview Ave")).toBeVisible();
+  await expect(page.getByText("active")).toBeVisible();
+});

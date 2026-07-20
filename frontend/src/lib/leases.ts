@@ -27,6 +27,24 @@ export interface LeaseInput {
   end_date: string;
 }
 
+export type LeaseState = "active" | "upcoming" | "ended";
+
+export interface LeaseSummary {
+  id: string;
+  property_id: string;
+  property_address: string;
+  tenant_name: string;
+  rent_amount: number;
+  rent_frequency: LeaseFrequency;
+  start_date: string;
+  end_date: string;
+  state: LeaseState;
+}
+
+export function listAllLeases() {
+  return apiFetch<LeaseSummary[]>("/api/v1/leases");
+}
+
 export function listLeases(propertyId: string) {
   return apiFetch<Lease[]>(`/api/v1/properties/${propertyId}/leases`);
 }
