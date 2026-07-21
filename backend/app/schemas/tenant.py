@@ -35,6 +35,8 @@ class TenantLease(BaseModel):
     landlord_name: str
     landlord_email: EmailStr
     landlord_phone: str | None
+    outstanding: Decimal
+    overdue_amount: Decimal
 
 
 class LeaseReminderInfo(BaseModel):
