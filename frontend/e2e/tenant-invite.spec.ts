@@ -40,4 +40,11 @@ test("landlord invites a tenant from the lease detail", async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/leases\/[0-9a-f-]+$/);
   await page.getByRole("button", { name: "Invite" }).first().click();
   await expect(page.getByText("Invitation sent to tessa@example.com")).toBeVisible();
+
+  // The invite is now pending — the button becomes Revoke.
+  await expect(page.getByRole("button", { name: "Revoke" })).toBeVisible();
+
+  // Revoking brings the Invite button back.
+  await page.getByRole("button", { name: "Revoke" }).click();
+  await expect(page.getByRole("button", { name: "Invite" })).toBeVisible();
 });

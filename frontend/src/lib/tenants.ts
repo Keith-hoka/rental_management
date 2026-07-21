@@ -5,6 +5,11 @@ export interface LeaseTenantInfo {
   email: string;
 }
 
+export interface LeaseInvitationInfo {
+  id: string;
+  email: string;
+}
+
 export interface TenantLease {
   id: string;
   property_address: string;
@@ -29,6 +34,16 @@ export function inviteTenant(leaseId: string, email: string) {
 
 export function listLeaseTenants(leaseId: string) {
   return apiFetch<LeaseTenantInfo[]>(`/api/v1/leases/${leaseId}/tenants`);
+}
+
+export function listLeaseInvitations(leaseId: string) {
+  return apiFetch<LeaseInvitationInfo[]>(`/api/v1/leases/${leaseId}/invitations`);
+}
+
+export function revokeLeaseInvitation(leaseId: string, invitationId: string) {
+  return apiFetch<void>(`/api/v1/leases/${leaseId}/invitations/${invitationId}`, {
+    method: "DELETE",
+  });
 }
 
 export function listMyLeases() {
