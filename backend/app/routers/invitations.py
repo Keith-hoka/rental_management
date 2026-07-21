@@ -12,7 +12,7 @@ from app.core.db import get_session
 from app.core.deps import require_roles
 from app.core.email import send_email
 from app.core.security import hash_password
-from app.models import Invitation, InvitationStatus, Membership, Role, User
+from app.models import Invitation, InvitationStatus, LeaseTenant, Membership, Role, User
 from app.routers.auth import issue_tokens
 from app.schemas.auth import TokenPair
 from app.schemas.invitation import (
@@ -126,6 +126,8 @@ async def accept_invitation(
     session.add(
         Membership(user_id=user.id, organization_id=invite.organization_id, role=invite.role)
     )
+    if invite.lease_id is not None:
+        session.add(LeaseTenant(lease_id=invite.lease_id, user_id=user.id))
     invite.status = InvitationStatus.accepted
     await session.commit()
     return issue_tokens(str(user.id))
