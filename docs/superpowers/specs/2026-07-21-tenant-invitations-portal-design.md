@@ -49,9 +49,12 @@ class LeaseTenant(Base):
 Modify `backend/app/models/invitation.py`:
 - Add `lease_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("leases.id"), nullable=True, index=True)` (None for property_manager invites; set for tenant invites).
 
+Modify `backend/app/models/user.py`:
+- Add `phone: Mapped[str | None] = mapped_column(String(50))` — an optional contact phone shown to tenants and editable by the user.
+
 Register `LeaseTenant` in `app/models/__init__.py`.
 
-**Migration:** one Alembic migration — add `invitations.lease_id` (nullable FK) and create `lease_tenants` (with the unique constraint and indexes). No enum changes. Verify an upgrade → downgrade → upgrade round-trip; downgrade drops `lease_tenants` and the `invitations.lease_id` column (nullable, so no backfill needed).
+**Migration:** one Alembic migration — add `users.phone` (nullable), add `invitations.lease_id` (nullable FK), and create `lease_tenants` (with the unique constraint and indexes). No enum changes. Verify an upgrade → downgrade → upgrade round-trip; downgrade drops `lease_tenants`, `invitations.lease_id`, and `users.phone` (all nullable, so no backfill needed).
 
 ## API endpoints
 
@@ -81,19 +84,30 @@ Register `LeaseTenant` in `app/models/__init__.py`.
 `GET /api/v1/me/leases` → `list[TenantLease]`
 - Dependency: `get_current_user` (no role gate).
 - Leases where the current user is a `LeaseTenant` (`join LeaseTenant on lease_id, filter user_id == current_user.id`), joined to `Property` for the address.
-- For each lease's organization, look up the landlord (the `Membership` with `role == Role.landlord`) → that `User`'s name + email.
-- `TenantLease`: `{ id, property_address, rent_amount, rent_frequency, start_date, end_date, bond_amount, notice_period_days, state, landlord_name, landlord_email }`, where `state` ∈ `active|upcoming|ended` derived from today (same rule as the leases overview).
+- For each lease's organization, look up the landlord (the `Membership` with `role == Role.landlord`) → that `User`'s name + email + phone.
+- `TenantLease`: `{ id, property_address, rent_amount, rent_frequency, start_date, end_date, bond_amount, notice_period_days, state, landlord_name, landlord_email, landlord_phone }` (`landlord_phone` may be null), where `state` ∈ `active|upcoming|ended` derived from today (same rule as the leases overview).
 - Lives in a new `app/routers/portal.py` (prefix `/api/v1/me`).
 
 Schemas in `backend/app/schemas/tenant.py`: `TenantInviteRequest`, `LeaseTenantInfo`, `TenantLease`.
 
+### Edit own contact info (any authenticated user)
+
+`GET /api/v1/auth/me` — extend `MeResponse` with `phone: str | None` (the current user's phone).
+
+`PATCH /api/v1/auth/me` → updated `MeResponse`
+- Dependency: `get_current_user`.
+- Body `ProfileUpdate`: `{ name?: str, phone?: str | None }` (email is the login identity and is not editable here).
+- Updates the current user's `name` / `phone` and returns the refreshed `MeResponse`. Lives in `app/routers/auth.py`. `ProfileUpdate` in `app/schemas/auth.py`.
+
 ## Frontend
 
 - `frontend/src/lib/tenants.ts`: `inviteTenant(leaseId, email)`, `listLeaseTenants(leaseId)`, `listMyLeases()` + the `LeaseTenantInfo` / `TenantLease` types.
+- `frontend/src/lib/profile.ts`: `getMe()`, `updateProfile({ name, phone })` + the `Me` type (`{ id, email, name, phone, role, organization_id }`).
 - **Lease detail page** (`app/leases/[leaseId]`, landlord/PM): a "Tenants" section listing joined tenants (from `listLeaseTenants`) and an invite form — an email input pre-filled with the lease's `tenant_email` + an "Invite tenant" button that calls `inviteTenant` and shows "Invitation sent". Surfaces the 409 (already a tenant) error.
+- **Profile page** (`app/profile/page.tsx`): a form to edit the current user's name + phone (reads `getMe`, saves `updateProfile`). Reachable by any signed-in user.
 - **Dashboard** (`app/page.tsx`): branch on `me.role`.
-  - `landlord` / `property_manager`: the existing dashboard (Properties, Leases, Team, …).
-  - `tenant`: a "Your lease" view — for each lease from `listMyLeases`, a read-only card (property, rent + frequency, term, bond, notice, state) plus "Landlord contact: {landlord_name} — {landlord_email}". Only Change password + Log out otherwise (no Properties/Leases/Team links).
+  - `landlord` / `property_manager`: the existing dashboard (Properties, Leases, Team, …) plus a **Contact info** link to `/app/profile`.
+  - `tenant`: a "Your lease" view — for each lease from `listMyLeases`, a read-only card (property, rent + frequency, term, bond, notice, state) plus "Landlord contact: {landlord_name} — {landlord_email} — {landlord_phone}" (phone omitted when null). Only Change password + Log out otherwise (no Properties/Leases/Team links).
 - The accept page (`/accept-invite`) is reused unchanged; a tenant who accepts is auto-logged-in and lands on the tenant dashboard.
 
 ## Security / RBAC
@@ -108,11 +122,12 @@ Schemas in `backend/app/schemas/tenant.py`: `TenantInviteRequest`, `LeaseTenantI
 **Backend (pytest):**
 - Invite: landlord/PM invites a tenant for a lease → 201; unauthenticated → 401; a `tenant`-role caller → 403; lease in another org → 404; inviting an email already joined to that lease → 409.
 - Accept (read the token from the DB via `db_session`, as in M3.1): creates a tenant `User` + `Membership(role=tenant)` + `LeaseTenant`; the tenant can log in, `/me` shows role `tenant`; a second, different email accepted for the same lease yields two `LeaseTenant` rows (co-tenants).
-- Tenant portal: `/api/v1/me/leases` returns the tenant's lease with correct `landlord_name`/`landlord_email` and `state`; tenant A does not see tenant B's lease; a landlord gets an empty list.
+- Tenant portal: `/api/v1/me/leases` returns the tenant's lease with correct `landlord_name`/`landlord_email`/`landlord_phone` and `state`; the landlord's phone reflects what the landlord saved via `PATCH /auth/me`; tenant A does not see tenant B's lease; a landlord gets an empty list.
 - Tenant RBAC: a tenant calling `GET /api/v1/properties` or `GET /api/v1/leases` → 403.
 - Lease tenants list: landlord sees the joined tenants' name/email; cross-org → 404.
+- Profile: `PATCH /api/v1/auth/me` updates the caller's name + phone and `GET /api/v1/auth/me` returns the new phone; requires auth (401 without a token).
 
-**e2e (Playwright):** landlord signs up → creates a property + lease → opens the lease detail → invites a tenant (email pre-filled; Invite → "Invitation sent"). The full accept-and-see-portal path is covered by backend tests because the invite token is emailed only (never returned by the API), matching the team-invitation e2e boundary.
+**e2e (Playwright):** landlord signs up → edits contact info on `/app/profile` (sets a phone) → creates a property + lease → opens the lease detail → invites a tenant (email pre-filled; Invite → "Invitation sent"). The full accept-and-see-portal path is covered by backend tests because the invite token is emailed only (never returned by the API), matching the team-invitation e2e boundary.
 
 ## Migration notes
 
