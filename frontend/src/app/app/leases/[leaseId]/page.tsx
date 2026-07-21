@@ -67,6 +67,12 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
     setForm({
       tenant_name: current.tenant_name,
       tenant_email: current.tenant_email,
+      tenant_phone: current.tenant_phone ?? "",
+      co_tenants: current.co_tenants.map((c) => ({
+        name: c.name,
+        email: c.email,
+        phone: c.phone ?? "",
+      })),
       rent_amount: current.rent_amount,
       rent_frequency: current.rent_frequency,
       bond_amount: current.bond_amount,

@@ -13,6 +13,7 @@ import {
   type LeaseSummary,
 } from "@/lib/leases";
 import { listProperties, type Property } from "@/lib/properties";
+import { TenantFields } from "@/app/app/leases/TenantFields";
 
 const STATE_STYLES: Record<LeaseState, string> = {
   active: "bg-green-100 text-green-800",
@@ -28,6 +29,8 @@ function emptyForm(): LeaseInput {
   return {
     tenant_name: "",
     tenant_email: "",
+    tenant_phone: "",
+    co_tenants: [],
     rent_amount: 0,
     rent_frequency: "monthly",
     bond_amount: null,
@@ -112,20 +115,13 @@ export default function AllLeasesPage() {
             <option key={p.id} value={p.id}>{`${p.address} (${p.status})`}</option>
           ))}
         </select>
-        <input
-          required
-          placeholder="Tenant name"
-          value={form.tenant_name}
-          onChange={(e) => set("tenant_name", e.target.value)}
-          className="w-full rounded border px-3 py-2"
-        />
-        <input
-          type="email"
-          required
-          placeholder="Tenant email"
-          value={form.tenant_email}
-          onChange={(e) => set("tenant_email", e.target.value)}
-          className="w-full rounded border px-3 py-2"
+        <TenantFields
+          tenantName={form.tenant_name}
+          tenantEmail={form.tenant_email}
+          tenantPhone={form.tenant_phone}
+          coTenants={form.co_tenants}
+          onMain={(field, value) => set(field, value)}
+          onCoTenants={(next) => set("co_tenants", next)}
         />
         <div className="flex gap-2">
           <label className="flex-1 text-sm text-gray-600">

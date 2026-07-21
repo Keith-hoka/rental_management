@@ -2,11 +2,19 @@ import { apiFetch } from "@/lib/api";
 
 export type LeaseFrequency = "weekly" | "fortnightly" | "monthly";
 
+export interface CoTenant {
+  name: string;
+  email: string;
+  phone: string;
+}
+
 export interface Lease {
   id: string;
   property_id: string;
   tenant_name: string;
   tenant_email: string;
+  tenant_phone: string | null;
+  co_tenants: CoTenant[];
   rent_amount: number;
   rent_frequency: LeaseFrequency;
   bond_amount: number | null;
@@ -19,6 +27,8 @@ export interface Lease {
 export interface LeaseInput {
   tenant_name: string;
   tenant_email: string;
+  tenant_phone: string;
+  co_tenants: CoTenant[];
   rent_amount: number;
   rent_frequency: LeaseFrequency;
   bond_amount: number | null;
