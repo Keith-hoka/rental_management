@@ -10,6 +10,11 @@ export interface LeaseInvitationInfo {
   email: string;
 }
 
+export interface LeaseReminderInfo {
+  threshold_days: number;
+  sent_at: string;
+}
+
 export interface TenantLease {
   id: string;
   property_address: string;
@@ -44,6 +49,10 @@ export function revokeLeaseInvitation(leaseId: string, invitationId: string) {
   return apiFetch<void>(`/api/v1/leases/${leaseId}/invitations/${invitationId}`, {
     method: "DELETE",
   });
+}
+
+export function listLeaseReminders(leaseId: string) {
+  return apiFetch<LeaseReminderInfo[]>(`/api/v1/leases/${leaseId}/reminders`);
 }
 
 export function listMyLeases() {

@@ -17,9 +17,11 @@ import { TenantFields } from "@/app/app/leases/TenantFields";
 import {
   inviteTenant,
   listLeaseInvitations,
+  listLeaseReminders,
   listLeaseTenants,
   revokeLeaseInvitation,
   type LeaseInvitationInfo,
+  type LeaseReminderInfo,
   type LeaseTenantInfo,
 } from "@/lib/tenants";
 
@@ -43,6 +45,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [confirming, setConfirming] = useState(false);
   const [joined, setJoined] = useState<LeaseTenantInfo[]>([]);
   const [pending, setPending] = useState<LeaseInvitationInfo[]>([]);
+  const [reminders, setReminders] = useState<LeaseReminderInfo[]>([]);
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -76,6 +79,13 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       })
       .catch(() => {
         if (active) setPending([]);
+      });
+    listLeaseReminders(leaseId)
+      .then((r) => {
+        if (active) setReminders(r);
+      })
+      .catch(() => {
+        if (active) setReminders([]);
       });
     return () => {
       active = false;
@@ -364,6 +374,22 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                 );
               })}
             </ul>
+          </section>
+
+          <section className="mt-8">
+            <h2 className="mb-2 font-semibold">Expiry reminders</h2>
+            {reminders.length === 0 ? (
+              <p className="text-sm text-gray-500">No reminders sent yet.</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-gray-700">
+                {reminders.map((r, i) => (
+                  <li key={i}>
+                    {r.threshold_days}-day reminder - sent{" "}
+                    {new Date(r.sent_at).toLocaleDateString()}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </>
       )}
