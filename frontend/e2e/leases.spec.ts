@@ -58,10 +58,10 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await page.goto("/app/leases");
   await page.getByRole("link", { name: "7 Lease Way" }).click();
   await expect(page).toHaveURL(/\/app\/leases\/[0-9a-f-]+$/);
-  await expect(page.getByText("tina@example.com")).toBeVisible();
+  await expect(page.getByText("tina@example.com", { exact: true })).toBeVisible();
   await expect(page.getByText(/\$3000/)).toBeVisible();
   await expect(page.getByText("21 days")).toBeVisible();
-  await expect(page.getByText("coco@example.com")).toBeVisible();
+  await expect(page.getByText("coco@example.com", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("This cannot be undone")).toBeVisible();
   await page.getByRole("button", { name: "Yes, delete" }).click();
