@@ -50,6 +50,9 @@ export default function DashboardPage() {
         <Link href="/app/change-password" className="rounded border px-3 py-1 text-blue-600">
           Change password
         </Link>
+        <Link href="/app/profile" className="rounded border px-3 py-1 text-blue-600">
+          Contact info
+        </Link>
         <button
           onClick={() => {
             clearTokens();
