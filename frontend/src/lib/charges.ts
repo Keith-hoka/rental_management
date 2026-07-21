@@ -6,6 +6,9 @@ export interface ChargeInfo {
   period_end: string;
   due_date: string;
   amount_due: number;
+  amount_paid: number;
+  status: "unpaid" | "partial" | "paid";
+  overdue: boolean;
 }
 
 export function listLeaseCharges(leaseId: string) {

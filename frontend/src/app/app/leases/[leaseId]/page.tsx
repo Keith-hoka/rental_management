@@ -14,6 +14,15 @@ import {
 } from "@/lib/leases";
 import { getProperty, type Property } from "@/lib/properties";
 import { listLeaseCharges, type ChargeInfo } from "@/lib/charges";
+import {
+  recordPayment,
+  listLeasePayments,
+  deleteLeasePayment,
+  getLeaseBalance,
+  type PaymentInfo,
+  type BalanceInfo,
+  type PaymentMethod,
+} from "@/lib/payments";
 import { TenantFields } from "@/app/app/leases/TenantFields";
 import {
   inviteTenant,
@@ -35,6 +44,18 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ChargeBadge({ status, overdue }: { status: string; overdue: boolean }) {
+  const label = overdue ? "Overdue" : status.charAt(0).toUpperCase() + status.slice(1);
+  const color = overdue
+    ? "bg-red-100 text-red-800"
+    : status === "paid"
+      ? "bg-green-100 text-green-800"
+      : status === "partial"
+        ? "bg-yellow-100 text-yellow-800"
+        : "bg-gray-100 text-gray-700";
+  return <span className={`rounded px-2 py-0.5 text-xs ${color}`}>{label}</span>;
+}
+
 export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId: string }> }) {
   const { leaseId } = use(params);
   const router = useRouter();
@@ -48,6 +69,12 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [pending, setPending] = useState<LeaseInvitationInfo[]>([]);
   const [reminders, setReminders] = useState<LeaseReminderInfo[]>([]);
   const [charges, setCharges] = useState<ChargeInfo[]>([]);
+  const [balance, setBalance] = useState<BalanceInfo | null>(null);
+  const [payments, setPayments] = useState<PaymentInfo[]>([]);
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState("");
+  const [payMethod, setPayMethod] = useState<PaymentMethod>("bank_transfer");
+  const [payNote, setPayNote] = useState("");
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -95,6 +122,20 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       })
       .catch(() => {
         if (active) setCharges([]);
+      });
+    getLeaseBalance(leaseId)
+      .then((b) => {
+        if (active) setBalance(b);
+      })
+      .catch(() => {
+        if (active) setBalance(null);
+      });
+    listLeasePayments(leaseId)
+      .then((p) => {
+        if (active) setPayments(p);
+      })
+      .catch(() => {
+        if (active) setPayments([]);
       });
     return () => {
       active = false;
@@ -174,6 +215,36 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
     } catch (err) {
       setInviteError(err instanceof ApiError ? err.message : "Revoke failed");
     }
+  }
+
+  async function refreshMoney() {
+    const [c, b, p] = await Promise.all([
+      listLeaseCharges(leaseId),
+      getLeaseBalance(leaseId),
+      listLeasePayments(leaseId),
+    ]);
+    setCharges(c);
+    setBalance(b);
+    setPayments(p);
+  }
+
+  async function onRecordPayment(e: React.FormEvent) {
+    e.preventDefault();
+    await recordPayment(leaseId, {
+      amount: Number(payAmount),
+      paid_on: payDate,
+      method: payMethod,
+      note: payNote || null,
+    });
+    setPayAmount("");
+    setPayDate("");
+    setPayNote("");
+    await refreshMoney();
+  }
+
+  async function onDeletePayment(paymentId: string) {
+    await deleteLeasePayment(leaseId, paymentId);
+    await refreshMoney();
   }
 
   return (
@@ -403,6 +474,20 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
 
           <section className="mt-8">
             <h2 className="mb-2 font-semibold">Rent charges</h2>
+            {balance && (
+              <p className="mb-2 text-sm text-gray-600">
+                Outstanding{" "}
+                <span className="font-medium text-gray-800">${balance.outstanding}</span>
+                {" · "}Overdue{" "}
+                <span className="font-medium text-red-600">${balance.overdue_amount}</span>
+                {balance.credit > 0 && (
+                  <>
+                    {" · "}Credit{" "}
+                    <span className="font-medium text-green-700">${balance.credit}</span>
+                  </>
+                )}
+              </p>
+            )}
             {charges.length === 0 ? (
               <p className="text-sm text-gray-500">No charges yet.</p>
             ) : (
@@ -411,13 +496,77 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                   <li key={c.id} className="flex justify-between">
                     <span>
                       {c.period_start} – {c.period_end} · due {c.due_date}
-                      {new Date(c.due_date) > new Date() && (
-                        <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
-                          Upcoming
-                        </span>
-                      )}
                     </span>
-                    <span className="font-medium text-gray-800">${c.amount_due}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-gray-500">
+                        ${c.amount_paid} / ${c.amount_due}
+                      </span>
+                      <ChargeBadge status={c.status} overdue={c.overdue} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-8">
+            <h2 className="mb-2 font-semibold">Payments</h2>
+            <form onSubmit={onRecordPayment} className="mb-3 flex flex-wrap gap-2">
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                placeholder="Amount"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                className="w-28 rounded border px-2 py-1 text-sm"
+              />
+              <input
+                type="date"
+                required
+                aria-label="Payment date"
+                value={payDate}
+                onChange={(e) => setPayDate(e.target.value)}
+                className="rounded border px-2 py-1 text-sm"
+              />
+              <select
+                aria-label="Payment method"
+                value={payMethod}
+                onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
+                className="rounded border px-2 py-1 text-sm"
+              >
+                <option value="bank_transfer">Bank transfer</option>
+                <option value="cash">Cash</option>
+                <option value="other">Other</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Note (optional)"
+                value={payNote}
+                onChange={(e) => setPayNote(e.target.value)}
+                className="flex-1 rounded border px-2 py-1 text-sm"
+              />
+              <button type="submit" className="rounded bg-blue-600 px-3 py-1 text-sm text-white">
+                Record payment
+              </button>
+            </form>
+            {payments.length === 0 ? (
+              <p className="text-sm text-gray-500">No payments yet.</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-gray-700">
+                {payments.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between">
+                    <span>
+                      {p.paid_on} · ${p.amount} · {p.method}
+                      {p.note ? ` · ${p.note}` : ""}
+                    </span>
+                    <button
+                      onClick={() => onDeletePayment(p.id)}
+                      className="rounded border border-red-500 px-2 py-0.5 text-xs text-red-600 transition hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
                   </li>
                 ))}
               </ul>
