@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.routers.auth import router as auth_router
 from app.routers.invitations import router as invitations_router
 from app.routers.leases import router as leases_router
+from app.routers.portal import router as portal_router
 from app.routers.properties import router as properties_router
 
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +25,7 @@ app.include_router(auth_router)
 app.include_router(properties_router)
 app.include_router(invitations_router)
 app.include_router(leases_router)
+app.include_router(portal_router)
 
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
