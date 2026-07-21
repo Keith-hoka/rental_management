@@ -8,9 +8,17 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 from app.models.lease import LeaseFrequency
 
 
+class CoTenant(BaseModel):
+    name: str
+    email: EmailStr
+    phone: str | None = None
+
+
 class LeaseCreate(BaseModel):
     tenant_name: str
     tenant_email: EmailStr
+    tenant_phone: str | None = None
+    co_tenants: list[CoTenant] = []
     rent_amount: Decimal
     rent_frequency: LeaseFrequency
     bond_amount: Decimal | None = None
@@ -22,6 +30,8 @@ class LeaseCreate(BaseModel):
 class LeaseUpdate(BaseModel):
     tenant_name: str | None = None
     tenant_email: EmailStr | None = None
+    tenant_phone: str | None = None
+    co_tenants: list[CoTenant] | None = None
     rent_amount: Decimal | None = None
     rent_frequency: LeaseFrequency | None = None
     bond_amount: Decimal | None = None
@@ -37,6 +47,8 @@ class LeaseResponse(BaseModel):
     property_id: uuid.UUID
     tenant_name: str
     tenant_email: EmailStr
+    tenant_phone: str | None
+    co_tenants: list[CoTenant]
     rent_amount: Decimal
     rent_frequency: LeaseFrequency
     bond_amount: Decimal | None

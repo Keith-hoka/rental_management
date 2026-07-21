@@ -284,3 +284,55 @@ async def test_list_all_org_leases_is_org_scoped(client):
     response = await client.get("/api/v1/leases", headers=org_b)
     assert response.status_code == 200
     assert response.json() == []
+
+
+async def test_create_lease_with_roster(client):
+    headers = await landlord_headers(client, "roster@example.com")
+    property_id = await make_property(client, headers)
+    response = await client.post(
+        f"/api/v1/properties/{property_id}/leases",
+        json=lease_body(
+            tenant_phone="555-1000",
+            co_tenants=[{"name": "Coco", "email": "coco@example.com", "phone": "555-2000"}],
+        ),
+        headers=headers,
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["tenant_phone"] == "555-1000"
+    assert body["co_tenants"] == [
+        {"name": "Coco", "email": "coco@example.com", "phone": "555-2000"}
+    ]
+
+
+async def test_create_lease_rejects_invalid_co_tenant_email(client):
+    headers = await landlord_headers(client, "badco@example.com")
+    property_id = await make_property(client, headers)
+    response = await client.post(
+        f"/api/v1/properties/{property_id}/leases",
+        json=lease_body(co_tenants=[{"name": "X", "email": "not-an-email", "phone": ""}]),
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
+async def test_update_lease_replaces_co_tenants(client):
+    headers = await landlord_headers(client, "replaceco@example.com")
+    property_id = await make_property(client, headers)
+    created = (
+        await client.post(
+            f"/api/v1/properties/{property_id}/leases",
+            json=lease_body(
+                co_tenants=[{"name": "First", "email": "first@example.com", "phone": ""}]
+            ),
+            headers=headers,
+        )
+    ).json()
+    response = await client.patch(
+        f"/api/v1/leases/{created['id']}",
+        json={"co_tenants": [{"name": "Second", "email": "second@example.com", "phone": "9"}]},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert [c["email"] for c in body["co_tenants"]] == ["second@example.com"]
