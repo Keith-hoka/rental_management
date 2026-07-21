@@ -13,11 +13,15 @@ test("a user can edit their contact info", async ({ page }) => {
 
   await page.getByRole("link", { name: "Contact info" }).click();
   await expect(page).toHaveURL(/\/app\/profile$/);
+  // The view shows the info; Edit opens the form.
+  await page.getByRole("button", { name: "Edit" }).click();
   await page.getByPlaceholder("Phone (optional)").fill("555-4242");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved")).toBeVisible();
+  // Back in view mode, the saved phone is shown.
+  await expect(page.getByText("555-4242")).toBeVisible();
 
   // Reload — the saved phone is fetched back.
   await page.reload();
-  await expect(page.getByPlaceholder("Phone (optional)")).toHaveValue("555-4242");
+  await expect(page.getByText("555-4242")).toBeVisible();
 });

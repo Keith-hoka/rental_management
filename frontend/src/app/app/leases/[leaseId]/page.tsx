@@ -217,6 +217,20 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             <Field label="Tenant" value={lease.tenant_name} />
             <Field label="Email" value={lease.tenant_email} />
             <Field label="Phone" value={lease.tenant_phone || "—"} />
+            {lease.co_tenants.length > 0 && (
+              <div className="border-b py-2">
+                <p className="mb-2 text-gray-500">Co-tenants</p>
+                <ul className="space-y-2">
+                  {lease.co_tenants.map((c, i) => (
+                    <li key={i} className="rounded bg-gray-50 p-2">
+                      <p className="font-medium text-gray-800">{c.name}</p>
+                      <p className="text-gray-600">{c.email}</p>
+                      {c.phone && <p className="text-gray-600">{c.phone}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <Field label="Rent" value={`$${lease.rent_amount} / ${lease.rent_frequency}`} />
             <Field
               label="Bond"
@@ -230,19 +244,6 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             />
             <Field label="Start" value={lease.start_date} />
             <Field label="End" value={lease.end_date} />
-            {lease.co_tenants.length > 0 && (
-              <div className="py-2">
-                <p className="text-gray-500">Co-tenants</p>
-                <ul className="mt-1 space-y-1">
-                  {lease.co_tenants.map((c, i) => (
-                    <li key={i} className="text-gray-800">
-                      {c.name} — {c.email}
-                      {c.phone ? ` — ${c.phone}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </dl>
           <div className="flex gap-2">
             <button
