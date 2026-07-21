@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     email_from: str = "onboarding@resend.dev"
     frontend_url: str = "http://localhost:3000"
 
+    # Lease-expiry reminders: daily job thresholds (days before end_date) and run hour.
+    reminders_enabled: bool = True
+    reminder_thresholds: list[int] = [60, 30, 7]
+    reminder_hour: int = 8
+
     # Directory where uploaded property images are stored (served at /uploads).
     upload_dir: str = "uploads"
 
