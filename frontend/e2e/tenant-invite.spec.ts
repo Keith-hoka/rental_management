@@ -51,4 +51,8 @@ test("landlord invites a tenant from the lease detail", async ({ page }) => {
   // A fresh lease has no reminders yet — the read-only section shows its empty state.
   await expect(page.getByRole("heading", { name: "Expiry reminders" })).toBeVisible();
   await expect(page.getByText("No reminders sent yet.")).toBeVisible();
+
+  // A fresh lease has no charges yet — the read-only section shows its empty state.
+  await expect(page.getByRole("heading", { name: "Rent charges" })).toBeVisible();
+  await expect(page.getByText("No charges yet.")).toBeVisible();
 });
