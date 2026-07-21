@@ -53,8 +53,8 @@ export default function PropertyLeasesPage({ params }: { params: Promise<{ id: s
         {leases.length === 0 && <li className="text-gray-500">No leases yet.</li>}
       </ul>
       <p className="mt-6">
-        <Link href={`/app/properties/${id}`} className="text-blue-600">
-          Back to property
+        <Link href="/app/properties" className="text-blue-600">
+          Back to properties
         </Link>
       </p>
     </main>
