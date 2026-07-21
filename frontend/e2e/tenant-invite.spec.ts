@@ -21,6 +21,7 @@ test("landlord invites a tenant from the lease detail", async ({ page }) => {
   // Create a lease with a main tenant from the Leases page.
   await page.goto("/app");
   await page.getByRole("link", { name: "Leases" }).click();
+  await page.getByRole("link", { name: "New lease" }).click();
   await page.getByLabel("Property").selectOption({ label: "5 Tenant Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Tessa Tenant");
   await page.getByPlaceholder("Tenant email").fill("tessa@example.com");

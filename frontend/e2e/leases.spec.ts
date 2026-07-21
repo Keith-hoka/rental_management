@@ -30,6 +30,8 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await page.goto("/app");
   await page.getByRole("link", { name: "Leases" }).click();
   await expect(page).toHaveURL(/\/app\/leases$/);
+  await page.getByRole("link", { name: "New lease" }).click();
+  await expect(page).toHaveURL(/\/app\/leases\/new$/);
   await page.getByLabel("Property").selectOption({ label: "7 Lease Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Tina Tenant");
   await page.getByPlaceholder("Tenant email").fill("tina@example.com");
@@ -96,6 +98,8 @@ test("leases are reachable from the dashboard and the properties list", async ({
   await page.goto("/app");
   await page.getByRole("link", { name: "Leases" }).click();
   await expect(page).toHaveURL(/\/app\/leases$/);
+  await page.getByRole("link", { name: "New lease" }).click();
+  await expect(page).toHaveURL(/\/app\/leases\/new$/);
   await page.getByLabel("Property").selectOption({ label: "9 Overview Ave (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Nav Tenant");
   await page.getByPlaceholder("Tenant email").fill("nav@example.com");

@@ -19,6 +19,7 @@ test("landlord records a payment on a lease", async ({ page }) => {
 
   await page.goto("/app");
   await page.getByRole("link", { name: "Leases" }).click();
+  await page.getByRole("link", { name: "New lease" }).click();
   await page.getByLabel("Property").selectOption({ label: "9 Pay Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Pat Payer");
   await page.getByPlaceholder("Tenant email").fill("pat@example.com");
