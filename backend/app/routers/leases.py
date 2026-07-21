@@ -15,7 +15,7 @@ from app.models import Invitation, Lease, LeaseTenant, Membership, Property, Rol
 from app.routers.properties import get_owned_property
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
-from app.schemas.tenant import TenantInviteRequest
+from app.schemas.tenant import LeaseTenantInfo, TenantInviteRequest
 
 router = APIRouter(prefix="/api/v1", tags=["leases"])
 
@@ -221,3 +221,19 @@ async def invite_tenant(
         logging.getLogger(__name__).exception("Failed to send invite email to %s", invite.email)
 
     return invite
+
+
+@router.get("/leases/{lease_id}/tenants", response_model=list[LeaseTenantInfo])
+async def list_lease_tenants(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[LeaseTenantInfo]:
+    """List the tenants who have joined the given lease."""
+    await get_owned_lease(lease_id, membership, session)
+    result = await session.execute(
+        select(User.name, User.email)
+        .join(LeaseTenant, LeaseTenant.user_id == User.id)
+        .where(LeaseTenant.lease_id == lease_id)
+    )
+    return [LeaseTenantInfo(name=name, email=email) for name, email in result.all()]

@@ -134,3 +134,24 @@ async def test_tenant_cannot_reach_management_endpoints(client, db_session):
         headers=tenant_headers,
     )
     assert invite_as_tenant.status_code == 403
+
+
+async def test_list_lease_tenants_returns_joined(client, db_session):
+    headers = await landlord_headers(client, "list-owner@example.com")
+    lease_id = await make_lease(client, headers)
+    token = await invite_token(client, db_session, headers, lease_id, "joined@example.com")
+    await accept(client, token, name="Joined Tenant")
+
+    response = await client.get(f"/api/v1/leases/{lease_id}/tenants", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert [t["email"] for t in body] == ["joined@example.com"]
+    assert body[0]["name"] == "Joined Tenant"
+
+
+async def test_list_lease_tenants_other_org_is_404(client):
+    org_a = await landlord_headers(client, "lta@example.com")
+    org_b = await landlord_headers(client, "ltb@example.com")
+    lease_id = await make_lease(client, org_a)
+    response = await client.get(f"/api/v1/leases/{lease_id}/tenants", headers=org_b)
+    assert response.status_code == 404
