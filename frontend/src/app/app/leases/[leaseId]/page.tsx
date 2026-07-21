@@ -13,6 +13,7 @@ import {
   type LeaseInput,
 } from "@/lib/leases";
 import { getProperty, type Property } from "@/lib/properties";
+import { TenantFields } from "@/app/app/leases/TenantFields";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -112,20 +113,13 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
 
       {editing && form ? (
         <form onSubmit={onSave} className="mb-6 space-y-3">
-          <input
-            required
-            placeholder="Tenant name"
-            value={form.tenant_name}
-            onChange={(e) => set("tenant_name", e.target.value)}
-            className="w-full rounded border px-3 py-2"
-          />
-          <input
-            type="email"
-            required
-            placeholder="Tenant email"
-            value={form.tenant_email}
-            onChange={(e) => set("tenant_email", e.target.value)}
-            className="w-full rounded border px-3 py-2"
+          <TenantFields
+            tenantName={form.tenant_name}
+            tenantEmail={form.tenant_email}
+            tenantPhone={form.tenant_phone}
+            coTenants={form.co_tenants}
+            onMain={(field, value) => set(field, value)}
+            onCoTenants={(next) => set("co_tenants", next)}
           />
           <div className="flex gap-2">
             <label className="flex-1 text-sm text-gray-600">
@@ -222,6 +216,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             <Field label="Property" value={property?.address ?? "—"} />
             <Field label="Tenant" value={lease.tenant_name} />
             <Field label="Email" value={lease.tenant_email} />
+            <Field label="Phone" value={lease.tenant_phone || "—"} />
             <Field label="Rent" value={`$${lease.rent_amount} / ${lease.rent_frequency}`} />
             <Field
               label="Bond"
@@ -235,6 +230,19 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             />
             <Field label="Start" value={lease.start_date} />
             <Field label="End" value={lease.end_date} />
+            {lease.co_tenants.length > 0 && (
+              <div className="py-2">
+                <p className="text-gray-500">Co-tenants</p>
+                <ul className="mt-1 space-y-1">
+                  {lease.co_tenants.map((c, i) => (
+                    <li key={i} className="text-gray-800">
+                      {c.name} — {c.email}
+                      {c.phone ? ` — ${c.phone}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </dl>
           <div className="flex gap-2">
             <button
