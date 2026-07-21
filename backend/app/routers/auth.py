@@ -24,6 +24,7 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     MeResponse,
+    ProfileUpdate,
     RefreshRequest,
     ResetPasswordRequest,
     SignupRequest,
@@ -86,6 +87,29 @@ async def me(
         id=user.id,
         email=user.email,
         name=user.name,
+        phone=user.phone,
+        role=membership.role.value,
+        organization_id=membership.organization_id,
+    )
+
+
+@router.patch("/me", response_model=MeResponse)
+async def update_me(
+    body: ProfileUpdate,
+    user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
+    session: AsyncSession = Depends(get_session),
+) -> MeResponse:
+    """Update the caller's own name / phone."""
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(user, field, value)
+    await session.commit()
+    await session.refresh(user)
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        phone=user.phone,
         role=membership.role.value,
         organization_id=membership.organization_id,
     )

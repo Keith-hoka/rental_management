@@ -29,8 +29,14 @@ class MeResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr
     name: str
+    phone: str | None = None
     role: str
     organization_id: uuid.UUID
+
+
+class ProfileUpdate(BaseModel):
+    name: str | None = None
+    phone: str | None = None
 
 
 class ForgotPasswordRequest(BaseModel):
