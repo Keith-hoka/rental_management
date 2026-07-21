@@ -1,15 +1,21 @@
+import logging
+import secrets
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.models import Lease, Membership, Property, Role
+from app.core.email import send_email
+from app.models import Invitation, Lease, LeaseTenant, Membership, Property, Role, User
 from app.routers.properties import get_owned_property
+from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
+from app.schemas.tenant import TenantInviteRequest
 
 router = APIRouter(prefix="/api/v1", tags=["leases"])
 
@@ -170,3 +176,48 @@ async def list_all_leases(
         )
         for lease, address in result.all()
     ]
+
+
+@router.post("/leases/{lease_id}/invite", status_code=201, response_model=InvitationResponse)
+async def invite_tenant(
+    lease_id: uuid.UUID,
+    body: TenantInviteRequest,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Invitation:
+    """Invite a tenant (by email) to a lease in the caller's organization."""
+    lease = await get_owned_lease(lease_id, membership, session)
+    already = (
+        await session.execute(
+            select(LeaseTenant.id)
+            .join(User, User.id == LeaseTenant.user_id)
+            .where(LeaseTenant.lease_id == lease_id, User.email == body.email)
+        )
+    ).first()
+    if already is not None:
+        raise HTTPException(status_code=409, detail="Already a tenant of this lease")
+
+    invite = Invitation(
+        organization_id=lease.organization_id,
+        email=body.email,
+        role=Role.tenant,
+        lease_id=lease.id,
+        token=secrets.token_urlsafe(32),
+        expires_at=datetime.now(UTC) + timedelta(days=7),
+    )
+    session.add(invite)
+    await session.commit()
+    await session.refresh(invite)
+
+    accept_url = f"{settings.frontend_url}/accept-invite?token={invite.token}"
+    html = (
+        "<p>You have been invited as a tenant on Rental Management.</p>"
+        f'<p><a href="{accept_url}">Accept the invitation</a></p>'
+        "<p>This link expires in 7 days.</p>"
+    )
+    try:
+        await send_email(invite.email, "You have been invited", html)
+    except Exception:  # noqa: BLE001 - email failure must not fail the invite
+        logging.getLogger(__name__).exception("Failed to send invite email to %s", invite.email)
+
+    return invite
