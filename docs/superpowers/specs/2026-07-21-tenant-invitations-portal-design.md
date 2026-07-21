@@ -32,6 +32,8 @@ Let a landlord or property_manager invite tenants (including multiple co-tenants
 
 5. **Onboarding is for new tenants only (this milestone).** The accept flow creates a brand-new account and returns 409 if the email is already registered. So co-tenants (several *different* emails on one lease) are fully supported, but linking an *already-registered* user to an additional lease (a returning tenant, or the same person on two units) is out of scope here — it would need a separate "link existing user" flow. The invite endpoint therefore only guards against inviting an email that is already a tenant *of this lease* (409); other already-registered emails are caught at accept time.
 
+6. **The lease carries a tenant roster (contact records), separate from accounts.** The lease stores the main tenant (`tenant_name`, `tenant_email`, `tenant_phone`) plus a `co_tenants` list of `{name, email, phone}` — the landlord's record of who lives there, entered/edited on the lease form (co-tenant rows are add/remove). This roster is independent of `LeaseTenant` (who has actually accepted an invite and created an account). The invite flow simply sends invitations to roster emails; accepting turns a roster email into a `LeaseTenant` account. `co_tenants` is a JSON column (edited as a unit with the lease, like `image_urls`); co-tenant emails are optional (a landlord may record a co-tenant they don't intend to invite).
+
 ## Data model
 
 New file `backend/app/models/lease_tenant.py`:
@@ -52,9 +54,13 @@ Modify `backend/app/models/invitation.py`:
 Modify `backend/app/models/user.py`:
 - Add `phone: Mapped[str | None] = mapped_column(String(50))` — an optional contact phone shown to tenants and editable by the user.
 
+Modify `backend/app/models/lease.py` (tenant roster):
+- Add `tenant_phone: Mapped[str | None] = mapped_column(String(50))` — the main tenant's phone.
+- Add `co_tenants: Mapped[list[dict]] = mapped_column(JSON, default=list)` — a list of `{name, email, phone}` co-tenant contact records.
+
 Register `LeaseTenant` in `app/models/__init__.py`.
 
-**Migration:** one Alembic migration — add `users.phone` (nullable), add `invitations.lease_id` (nullable FK), and create `lease_tenants` (with the unique constraint and indexes). No enum changes. Verify an upgrade → downgrade → upgrade round-trip; downgrade drops `lease_tenants`, `invitations.lease_id`, and `users.phone` (all nullable, so no backfill needed).
+**Migration:** one Alembic migration — add `users.phone` (nullable), add `leases.tenant_phone` (nullable) and `leases.co_tenants` (JSON, server_default `'[]'` so existing rows backfill), add `invitations.lease_id` (nullable FK), and create `lease_tenants` (with the unique constraint and indexes). No enum changes. Verify an upgrade → downgrade → upgrade round-trip; downgrade drops `lease_tenants` and the added columns (all nullable / defaulted, so no backfill issue).
 
 ## API endpoints
 
@@ -90,6 +96,8 @@ Register `LeaseTenant` in `app/models/__init__.py`.
 
 Schemas in `backend/app/schemas/tenant.py`: `TenantInviteRequest`, `LeaseTenantInfo`, `TenantLease`.
 
+**Lease schema changes** (`backend/app/schemas/lease.py`): add a `CoTenant` model `{ name: str, email: EmailStr, phone: str | None }`. `LeaseCreate`, `LeaseUpdate`, and `LeaseResponse` gain `tenant_phone: str | None` and `co_tenants: list[CoTenant]` (default `[]`). Update also replaces the whole `co_tenants` list. `TenantLease` (portal) does not expose co-tenants — a tenant sees their own lease terms + landlord contact, not the other tenants' details.
+
 ### Edit own contact info (any authenticated user)
 
 `GET /api/v1/auth/me` — extend `MeResponse` with `phone: str | None` (the current user's phone).
@@ -103,7 +111,8 @@ Schemas in `backend/app/schemas/tenant.py`: `TenantInviteRequest`, `LeaseTenantI
 
 - `frontend/src/lib/tenants.ts`: `inviteTenant(leaseId, email)`, `listLeaseTenants(leaseId)`, `listMyLeases()` + the `LeaseTenantInfo` / `TenantLease` types.
 - `frontend/src/lib/profile.ts`: `getMe()`, `updateProfile({ name, phone })` + the `Me` type (`{ id, email, name, phone, role, organization_id }`).
-- **Lease detail page** (`app/leases/[leaseId]`, landlord/PM): a "Tenants" section listing joined tenants (from `listLeaseTenants`) and an invite form — an email input pre-filled with the lease's `tenant_email` + an "Invite tenant" button that calls `inviteTenant` and shows "Invitation sent". Surfaces the 409 (already a tenant) error.
+- **Lease create/edit forms** (`app/leases/page.tsx` add form and `app/leases/[leaseId]` edit form): the tenant section becomes a **main tenant** group (name, email, phone) plus a **co-tenants** group — a dynamic list where each row has name / email / phone and a "Remove" button, and an "Add co-tenant" button appends a blank row. On submit the whole `co_tenants` array is sent; `tenant_phone` and co-tenant phones are optional.
+- **Lease detail page** (`app/leases/[leaseId]`, landlord/PM): a "Tenants" section that (a) lists the roster (main tenant + co-tenants) each with name/email and an "Invite" button that calls `inviteTenant(leaseId, email)` and shows "Invitation sent", and (b) lists who has actually joined (from `listLeaseTenants`). Surfaces the 409 (already a tenant) error.
 - **Profile page** (`app/profile/page.tsx`): a form to edit the current user's name + phone (reads `getMe`, saves `updateProfile`). Reachable by any signed-in user.
 - **Dashboard** (`app/page.tsx`): branch on `me.role`.
   - `landlord` / `property_manager`: the existing dashboard (Properties, Leases, Team, …) plus a **Contact info** link to `/app/profile`.
@@ -125,9 +134,10 @@ Schemas in `backend/app/schemas/tenant.py`: `TenantInviteRequest`, `LeaseTenantI
 - Tenant portal: `/api/v1/me/leases` returns the tenant's lease with correct `landlord_name`/`landlord_email`/`landlord_phone` and `state`; the landlord's phone reflects what the landlord saved via `PATCH /auth/me`; tenant A does not see tenant B's lease; a landlord gets an empty list.
 - Tenant RBAC: a tenant calling `GET /api/v1/properties` or `GET /api/v1/leases` → 403.
 - Lease tenants list: landlord sees the joined tenants' name/email; cross-org → 404.
+- Lease roster: creating and updating a lease with `tenant_phone` and a `co_tenants` list round-trips (the response echoes them); a co-tenant with an invalid email → 422; updating replaces the whole `co_tenants` list.
 - Profile: `PATCH /api/v1/auth/me` updates the caller's name + phone and `GET /api/v1/auth/me` returns the new phone; requires auth (401 without a token).
 
-**e2e (Playwright):** landlord signs up → edits contact info on `/app/profile` (sets a phone) → creates a property + lease → opens the lease detail → invites a tenant (email pre-filled; Invite → "Invitation sent"). The full accept-and-see-portal path is covered by backend tests because the invite token is emailed only (never returned by the API), matching the team-invitation e2e boundary.
+**e2e (Playwright):** landlord signs up → edits contact info on `/app/profile` (sets a phone) → creates a property + a lease that includes a main tenant and one added co-tenant row → opens the lease detail → invites a tenant from the roster (Invite → "Invitation sent"). The full accept-and-see-portal path is covered by backend tests because the invite token is emailed only (never returned by the API), matching the team-invitation e2e boundary.
 
 ## Migration notes
 
