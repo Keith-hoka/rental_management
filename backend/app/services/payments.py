@@ -3,7 +3,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from app.models import Charge
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Charge, Payment
 
 ChargeState = Literal["unpaid", "partial", "paid"]
 
@@ -58,3 +61,25 @@ def summarize(statuses: list[ChargeStatus], total_paid: Decimal, today: date) ->
         overdue_amount=overdue_amount,
         credit=total_paid - allocated_total,
     )
+
+
+async def _total_paid(session: AsyncSession, lease_id) -> Decimal:
+    result = await session.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.lease_id == lease_id)
+    )
+    return Decimal(result.scalar_one())
+
+
+async def _charges(session: AsyncSession, lease_id) -> list[Charge]:
+    result = await session.execute(select(Charge).where(Charge.lease_id == lease_id))
+    return list(result.scalars().all())
+
+
+async def lease_statuses(session: AsyncSession, lease_id, today: date) -> list[ChargeStatus]:
+    return allocate(await _charges(session, lease_id), await _total_paid(session, lease_id), today)
+
+
+async def lease_balance(session: AsyncSession, lease_id, today: date) -> Balance:
+    charges = await _charges(session, lease_id)
+    total = await _total_paid(session, lease_id)
+    return summarize(allocate(charges, total, today), total, today)

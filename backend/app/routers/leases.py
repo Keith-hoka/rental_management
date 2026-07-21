@@ -12,7 +12,6 @@ from app.core.db import get_session
 from app.core.deps import require_roles
 from app.core.email import send_email
 from app.models import (
-    Charge,
     Invitation,
     InvitationStatus,
     Lease,
@@ -25,6 +24,7 @@ from app.models import (
 )
 from app.routers.properties import get_owned_property
 from app.schemas.charge import ChargeInfo
+from app.services.payments import lease_statuses
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
 from app.schemas.tenant import (
@@ -301,28 +301,22 @@ async def list_lease_charges(
     membership: Membership = Depends(manager),
     session: AsyncSession = Depends(get_session),
 ) -> list[ChargeInfo]:
-    """List rent charges for the given lease, newest due date first."""
+    """List rent charges for the given lease with payment status, newest due date first."""
     await get_owned_lease(lease_id, membership, session)
-    result = await session.execute(
-        select(
-            Charge.id,
-            Charge.period_start,
-            Charge.period_end,
-            Charge.due_date,
-            Charge.amount_due,
-        )
-        .where(Charge.lease_id == lease_id)
-        .order_by(Charge.due_date.desc())
-    )
+    statuses = await lease_statuses(session, lease_id, datetime.now(UTC).date())
+    statuses.reverse()  # allocate sorts ascending by due date; newest first for the response
     return [
         ChargeInfo(
-            id=id_,
-            period_start=period_start,
-            period_end=period_end,
-            due_date=due_date,
-            amount_due=amount_due,
+            id=s.charge.id,
+            period_start=s.charge.period_start,
+            period_end=s.charge.period_end,
+            due_date=s.charge.due_date,
+            amount_due=s.charge.amount_due,
+            amount_paid=s.amount_paid,
+            status=s.status,
+            overdue=s.overdue,
         )
-        for id_, period_start, period_end, due_date, amount_due in result.all()
+        for s in statuses
     ]
 
 

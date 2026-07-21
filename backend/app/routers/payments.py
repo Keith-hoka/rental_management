@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
@@ -7,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.models import Membership, Payment
 from app.routers.leases import get_owned_lease, manager
-from app.schemas.payment import PaymentCreate, PaymentInfo
+from app.schemas.payment import BalanceInfo, PaymentCreate, PaymentInfo
+from app.services.payments import lease_balance
 
 router = APIRouter(prefix="/api/v1", tags=["payments"])
 
@@ -79,3 +81,19 @@ async def delete_payment(
     await session.delete(payment)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.get("/leases/{lease_id}/balance", response_model=BalanceInfo)
+async def get_balance(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> BalanceInfo:
+    """Outstanding / overdue / credit summary for a lease in the caller's organization."""
+    await get_owned_lease(lease_id, membership, session)
+    balance = await lease_balance(session, lease_id, datetime.now(UTC).date())
+    return BalanceInfo(
+        outstanding=balance.outstanding,
+        overdue_amount=balance.overdue_amount,
+        credit=balance.credit,
+    )

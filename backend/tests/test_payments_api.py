@@ -1,3 +1,9 @@
+import uuid
+from datetime import date
+
+from sqlalchemy import select
+
+from app.models import Charge, Lease
 from tests.test_leases import lease_body, make_property
 from tests.test_properties_crud import landlord_headers
 
@@ -67,3 +73,49 @@ async def test_payments_requires_auth(client):
     lid = await _lease_id(client, headers, await make_property(client, headers))
     resp = await client.get(f"/api/v1/leases/{lid}/payments")
     assert resp.status_code == 401
+
+
+async def _add_charge(db_session, lease_id, due, amount):
+    lease = (
+        await db_session.execute(select(Lease).where(Lease.id == uuid.UUID(lease_id)))
+    ).scalar_one()
+    db_session.add(
+        Charge(
+            organization_id=lease.organization_id,
+            lease_id=lease.id,
+            period_start=due,
+            period_end=due,
+            due_date=due,
+            amount_due=amount,
+        )
+    )
+    await db_session.commit()
+
+
+async def test_charges_reflect_payment_status(client, db_session):
+    headers = await landlord_headers(client, "paycs@example.com")
+    lid = await _lease_id(client, headers, await make_property(client, headers))
+    await _add_charge(db_session, lid, date(2026, 1, 1), 1000)
+
+    await client.post(
+        f"/api/v1/leases/{lid}/payments", json={**PAY, "amount": 1000}, headers=headers
+    )
+
+    charges = (await client.get(f"/api/v1/leases/{lid}/charges", headers=headers)).json()
+    assert charges[0]["status"] == "paid"
+    assert float(charges[0]["amount_paid"]) == 1000.0
+
+
+async def test_balance_endpoint_matches(client, db_session):
+    headers = await landlord_headers(client, "paybal@example.com")
+    lid = await _lease_id(client, headers, await make_property(client, headers))
+    await _add_charge(db_session, lid, date(2020, 1, 1), 1000)  # past due
+
+    await client.post(
+        f"/api/v1/leases/{lid}/payments", json={**PAY, "amount": 300}, headers=headers
+    )
+
+    bal = (await client.get(f"/api/v1/leases/{lid}/balance", headers=headers)).json()
+    assert float(bal["outstanding"]) == 700.0
+    assert float(bal["overdue_amount"]) == 700.0
+    assert float(bal["credit"]) == 0.0
