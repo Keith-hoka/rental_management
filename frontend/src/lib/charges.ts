@@ -14,3 +14,7 @@ export interface ChargeInfo {
 export function listLeaseCharges(leaseId: string) {
   return apiFetch<ChargeInfo[]>(`/api/v1/leases/${leaseId}/charges`);
 }
+
+export function listMyLeaseCharges(leaseId: string) {
+  return apiFetch<ChargeInfo[]>(`/api/v1/me/leases/${leaseId}/charges`);
+}

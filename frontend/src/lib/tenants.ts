@@ -28,6 +28,8 @@ export interface TenantLease {
   landlord_name: string;
   landlord_email: string;
   landlord_phone: string | null;
+  outstanding: number;
+  overdue_amount: number;
 }
 
 export function inviteTenant(leaseId: string, email: string) {

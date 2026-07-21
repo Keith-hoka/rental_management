@@ -6,6 +6,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
 import { listMyLeases, type TenantLease } from "@/lib/tenants";
+import { listMyLeaseCharges, type ChargeInfo } from "@/lib/charges";
 
 interface Me {
   email: string;
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [myLeases, setMyLeases] = useState<TenantLease[]>([]);
+  const [chargesByLease, setChargesByLease] = useState<Record<string, ChargeInfo[]>>({});
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -29,8 +31,17 @@ export default function DashboardPage() {
         if (!active) return;
         setMe(m);
         if (m.role === "tenant") {
-          return listMyLeases().then((l) => {
-            if (active) setMyLeases(l);
+          return listMyLeases().then(async (l) => {
+            if (!active) return;
+            setMyLeases(l);
+            const entries = await Promise.all(
+              l.map((lease) =>
+                listMyLeaseCharges(lease.id)
+                  .then((c) => [lease.id, c] as const)
+                  .catch(() => [lease.id, []] as const),
+              ),
+            );
+            if (active) setChargesByLease(Object.fromEntries(entries));
           });
         }
       })
@@ -73,6 +84,25 @@ export default function DashboardPage() {
                 Landlord contact: {l.landlord_name} — {l.landlord_email}
                 {l.landlord_phone ? ` — ${l.landlord_phone}` : ""}
               </p>
+              <p className="mt-1 text-gray-700">
+                Outstanding <span className="font-medium text-gray-800">${l.outstanding}</span>
+                {" · "}Overdue{" "}
+                <span className="font-medium text-red-600">${l.overdue_amount}</span>
+              </p>
+              {(chargesByLease[l.id]?.length ?? 0) > 0 && (
+                <ul className="mt-2 space-y-1 text-gray-700">
+                  {chargesByLease[l.id].map((c) => (
+                    <li key={c.id} className="flex justify-between">
+                      <span>
+                        {c.period_start} – {c.period_end} · due {c.due_date}
+                      </span>
+                      <span>
+                        ${c.amount_paid} / ${c.amount_due} · {c.overdue ? "Overdue" : c.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
           {myLeases.length === 0 && <li className="text-gray-500">No lease yet.</li>}
