@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -65,3 +65,50 @@ async def test_lease_roster_columns(db_session):
     found = (await db_session.execute(select(Lease).where(Lease.id == lease.id))).scalar_one()
     assert found.tenant_phone == "555-1000"
     assert found.co_tenants == [{"name": "Coco", "email": "coco@example.com", "phone": "555-2000"}]
+
+
+async def test_lease_tenant_link_and_cascade(db_session):
+    from app.models import Invitation, InvitationStatus, LeaseTenant, Role, User
+
+    org = Organization(name="Cascade Org", currency="USD")
+    db_session.add(org)
+    await db_session.flush()
+    prop = Property(organization_id=org.id, address="1 Cascade St", type=PropertyType.house)
+    db_session.add(prop)
+    await db_session.flush()
+    lease = Lease(
+        organization_id=org.id,
+        property_id=prop.id,
+        tenant_name="T",
+        tenant_email="t@example.com",
+        rent_amount=Decimal("1000.00"),
+        rent_frequency=LeaseFrequency.monthly,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    user = User(email="tenant@example.com", hashed_password="x", name="Tenant")
+    db_session.add_all([lease, user])
+    await db_session.flush()
+
+    db_session.add(LeaseTenant(lease_id=lease.id, user_id=user.id))
+    db_session.add(
+        Invitation(
+            organization_id=org.id,
+            email="tenant@example.com",
+            role=Role.tenant,
+            lease_id=lease.id,
+            token="cascade-tok",
+            status=InvitationStatus.pending,
+            expires_at=datetime.now(UTC) + timedelta(days=7),
+        )
+    )
+    await db_session.commit()
+
+    await db_session.delete(lease)
+    await db_session.commit()
+    assert (
+        await db_session.execute(select(LeaseTenant).where(LeaseTenant.lease_id == lease.id))
+    ).first() is None
+    assert (
+        await db_session.execute(select(Invitation).where(Invitation.lease_id == lease.id))
+    ).first() is None

@@ -20,6 +20,9 @@ class Invitation(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
+    lease_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leases.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     email: Mapped[str] = mapped_column(String(255), index=True)
     role: Mapped[Role] = mapped_column(Enum(Role))
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
