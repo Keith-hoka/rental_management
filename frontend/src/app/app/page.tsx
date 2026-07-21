@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
 import { listMyLeases, type TenantLease } from "@/lib/tenants";
 import { listMyLeaseCharges, type ChargeInfo } from "@/lib/charges";
+import { getDashboardStats, type DashboardStats } from "@/lib/stats";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface Me {
   email: string;
@@ -14,11 +16,21 @@ interface Me {
   role: string;
 }
 
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border p-3">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-lg font-semibold text-gray-800">{value}</p>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [myLeases, setMyLeases] = useState<TenantLease[]>([]);
   const [chargesByLease, setChargesByLease] = useState<Record<string, ChargeInfo[]>>({});
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -44,6 +56,13 @@ export default function DashboardPage() {
             if (active) setChargesByLease(Object.fromEntries(entries));
           });
         }
+        return getDashboardStats()
+          .then((s) => {
+            if (active) setStats(s);
+          })
+          .catch(() => {
+            if (active) setStats(null);
+          });
       })
       .catch(() => {
         clearTokens();
@@ -128,6 +147,32 @@ export default function DashboardPage() {
       <p data-testid="welcome" className="mt-2 text-gray-700">
         Welcome, {me.name} ({me.role})
       </p>
+      {stats && (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <StatCard label="Outstanding" value={`$${stats.outstanding}`} />
+            <StatCard label="Overdue" value={`$${stats.overdue}`} />
+            <StatCard label="Collected this month" value={`$${stats.collected_this_month}`} />
+            <StatCard
+              label="Properties"
+              value={`${stats.properties_occupied} of ${stats.properties_total} occupied`}
+            />
+            <StatCard label="Active leases" value={String(stats.active_leases)} />
+            <StatCard label="Tenants" value={String(stats.tenants)} />
+          </div>
+          <h2 className="mb-2 mt-6 font-semibold">Monthly income</h2>
+          <div className="mb-2">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={stats.monthly_income}>
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="amount" fill="#2563eb" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
       <div className="mt-4 flex gap-3">
         <Link href="/app/properties" className="rounded border px-3 py-1 text-blue-600">
           Properties
