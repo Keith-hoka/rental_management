@@ -155,3 +155,29 @@ async def test_list_lease_tenants_other_org_is_404(client):
     lease_id = await make_lease(client, org_a)
     response = await client.get(f"/api/v1/leases/{lease_id}/tenants", headers=org_b)
     assert response.status_code == 404
+
+
+async def test_list_lease_invitations_shows_pending(client):
+    headers = await landlord_headers(client, "listinv-owner@example.com")
+    lease_id = await make_lease(client, headers)
+    await client.post(
+        f"/api/v1/leases/{lease_id}/invite", json={"email": "pend@example.com"}, headers=headers
+    )
+    response = await client.get(f"/api/v1/leases/{lease_id}/invitations", headers=headers)
+    assert response.status_code == 200
+    assert [i["email"] for i in response.json()] == ["pend@example.com"]
+
+
+async def test_revoke_lease_invitation_removes_it(client):
+    headers = await landlord_headers(client, "revinv-owner@example.com")
+    lease_id = await make_lease(client, headers)
+    await client.post(
+        f"/api/v1/leases/{lease_id}/invite", json={"email": "rev@example.com"}, headers=headers
+    )
+    inv = (await client.get(f"/api/v1/leases/{lease_id}/invitations", headers=headers)).json()[0]
+    revoked = await client.delete(
+        f"/api/v1/leases/{lease_id}/invitations/{inv['id']}", headers=headers
+    )
+    assert revoked.status_code == 204
+    after = (await client.get(f"/api/v1/leases/{lease_id}/invitations", headers=headers)).json()
+    assert after == []

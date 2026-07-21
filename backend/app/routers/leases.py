@@ -11,11 +11,20 @@ from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import require_roles
 from app.core.email import send_email
-from app.models import Invitation, Lease, LeaseTenant, Membership, Property, Role, User
+from app.models import (
+    Invitation,
+    InvitationStatus,
+    Lease,
+    LeaseTenant,
+    Membership,
+    Property,
+    Role,
+    User,
+)
 from app.routers.properties import get_owned_property
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
-from app.schemas.tenant import LeaseTenantInfo, TenantInviteRequest
+from app.schemas.tenant import LeaseInvitationInfo, LeaseTenantInfo, TenantInviteRequest
 
 router = APIRouter(prefix="/api/v1", tags=["leases"])
 
@@ -237,3 +246,42 @@ async def list_lease_tenants(
         .where(LeaseTenant.lease_id == lease_id)
     )
     return [LeaseTenantInfo(name=name, email=email) for name, email in result.all()]
+
+
+@router.get("/leases/{lease_id}/invitations", response_model=list[LeaseInvitationInfo])
+async def list_lease_invitations(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[LeaseInvitationInfo]:
+    """List pending tenant invitations for the given lease."""
+    await get_owned_lease(lease_id, membership, session)
+    result = await session.execute(
+        select(Invitation.id, Invitation.email)
+        .where(Invitation.lease_id == lease_id, Invitation.status == InvitationStatus.pending)
+        .order_by(Invitation.created_at.desc())
+    )
+    return [LeaseInvitationInfo(id=id_, email=email) for id_, email in result.all()]
+
+
+@router.delete("/leases/{lease_id}/invitations/{invitation_id}", status_code=204)
+async def revoke_lease_invitation(
+    lease_id: uuid.UUID,
+    invitation_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Revoke a pending tenant invitation for the given lease."""
+    await get_owned_lease(lease_id, membership, session)
+    invite = (
+        await session.execute(
+            select(Invitation).where(
+                Invitation.id == invitation_id, Invitation.lease_id == lease_id
+            )
+        )
+    ).scalar_one_or_none()
+    if invite is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    invite.status = InvitationStatus.revoked
+    await session.commit()
+    return Response(status_code=204)

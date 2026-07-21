@@ -17,6 +17,11 @@ class LeaseTenantInfo(BaseModel):
     email: EmailStr
 
 
+class LeaseInvitationInfo(BaseModel):
+    id: uuid.UUID
+    email: EmailStr
+
+
 class TenantLease(BaseModel):
     id: uuid.UUID
     property_address: str
