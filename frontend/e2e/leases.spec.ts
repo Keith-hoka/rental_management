@@ -33,6 +33,11 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await page.getByLabel("Property").selectOption({ label: "7 Lease Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Tina Tenant");
   await page.getByPlaceholder("Tenant email").fill("tina@example.com");
+  await page.getByPlaceholder("Tenant phone (optional)").fill("555-1000");
+  await page.getByRole("button", { name: "Add co-tenant" }).click();
+  await page.getByLabel("Co-tenant 1 name").fill("Coco Tenant");
+  await page.getByLabel("Co-tenant 1 email").fill("coco@example.com");
+  await page.getByLabel("Co-tenant 1 phone").fill("555-2000");
   await page.getByLabel("Rent").fill("1500");
   await page.getByLabel("Bond (optional)").fill("3000");
   await page.getByLabel("Notice period (days)").fill("21");
@@ -56,6 +61,7 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await expect(page.getByText("tina@example.com")).toBeVisible();
   await expect(page.getByText(/\$3000/)).toBeVisible();
   await expect(page.getByText("21 days")).toBeVisible();
+  await expect(page.getByText("coco@example.com")).toBeVisible();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("This cannot be undone")).toBeVisible();
   await page.getByRole("button", { name: "Yes, delete" }).click();
