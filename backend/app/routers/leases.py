@@ -12,6 +12,7 @@ from app.core.db import get_session
 from app.core.deps import require_roles
 from app.core.email import send_email
 from app.models import (
+    Charge,
     Invitation,
     InvitationStatus,
     Lease,
@@ -23,6 +24,7 @@ from app.models import (
     User,
 )
 from app.routers.properties import get_owned_property
+from app.schemas.charge import ChargeInfo
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
 from app.schemas.tenant import (
@@ -291,6 +293,37 @@ async def revoke_lease_invitation(
     invite.status = InvitationStatus.revoked
     await session.commit()
     return Response(status_code=204)
+
+
+@router.get("/leases/{lease_id}/charges", response_model=list[ChargeInfo])
+async def list_lease_charges(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[ChargeInfo]:
+    """List rent charges for the given lease, newest due date first."""
+    await get_owned_lease(lease_id, membership, session)
+    result = await session.execute(
+        select(
+            Charge.id,
+            Charge.period_start,
+            Charge.period_end,
+            Charge.due_date,
+            Charge.amount_due,
+        )
+        .where(Charge.lease_id == lease_id)
+        .order_by(Charge.due_date.desc())
+    )
+    return [
+        ChargeInfo(
+            id=id_,
+            period_start=period_start,
+            period_end=period_end,
+            due_date=due_date,
+            amount_due=amount_due,
+        )
+        for id_, period_start, period_end, due_date, amount_due in result.all()
+    ]
 
 
 @router.get("/leases/{lease_id}/reminders", response_model=list[LeaseReminderInfo])
