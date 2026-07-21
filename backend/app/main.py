@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -6,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
+from app.core.scheduler import scheduler, start_scheduler
 from app.routers.auth import router as auth_router
 from app.routers.invitations import router as invitations_router
 from app.routers.leases import router as leases_router
@@ -14,7 +16,18 @@ from app.routers.properties import router as properties_router
 
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Rental Management API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the reminder scheduler on boot; stop it on shutdown."""
+    if settings.reminders_enabled:
+        start_scheduler()
+    yield
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="Rental Management API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
