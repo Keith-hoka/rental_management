@@ -15,6 +15,7 @@ from app.models import (
     Invitation,
     InvitationStatus,
     Lease,
+    LeaseReminder,
     LeaseTenant,
     Membership,
     Property,
@@ -24,7 +25,12 @@ from app.models import (
 from app.routers.properties import get_owned_property
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
-from app.schemas.tenant import LeaseInvitationInfo, LeaseTenantInfo, TenantInviteRequest
+from app.schemas.tenant import (
+    LeaseInvitationInfo,
+    LeaseReminderInfo,
+    LeaseTenantInfo,
+    TenantInviteRequest,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["leases"])
 
@@ -285,3 +291,22 @@ async def revoke_lease_invitation(
     invite.status = InvitationStatus.revoked
     await session.commit()
     return Response(status_code=204)
+
+
+@router.get("/leases/{lease_id}/reminders", response_model=list[LeaseReminderInfo])
+async def list_lease_reminders(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[LeaseReminderInfo]:
+    """List expiry reminders sent for the given lease, newest first."""
+    await get_owned_lease(lease_id, membership, session)
+    result = await session.execute(
+        select(LeaseReminder.threshold_days, LeaseReminder.sent_at)
+        .where(LeaseReminder.lease_id == lease_id)
+        .order_by(LeaseReminder.sent_at.desc())
+    )
+    return [
+        LeaseReminderInfo(threshold_days=threshold, sent_at=sent_at)
+        for threshold, sent_at in result.all()
+    ]

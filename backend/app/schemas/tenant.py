@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -35,3 +35,8 @@ class TenantLease(BaseModel):
     landlord_name: str
     landlord_email: EmailStr
     landlord_phone: str | None
+
+
+class LeaseReminderInfo(BaseModel):
+    threshold_days: int
+    sent_at: datetime
