@@ -14,6 +14,7 @@ import {
 } from "@/lib/leases";
 import { getProperty, type Property } from "@/lib/properties";
 import { TenantFields } from "@/app/app/leases/TenantFields";
+import { inviteTenant, listLeaseTenants, type LeaseTenantInfo } from "@/lib/tenants";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -33,6 +34,9 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [form, setForm] = useState<LeaseInput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [joined, setJoined] = useState<LeaseTenantInfo[]>([]);
+  const [inviteStatus, setInviteStatus] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -50,6 +54,13 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       })
       .catch(() => {
         if (active) setError("Lease not found");
+      });
+    listLeaseTenants(leaseId)
+      .then((t) => {
+        if (active) setJoined(t);
+      })
+      .catch(() => {
+        if (active) setJoined([]);
       });
     return () => {
       active = false;
@@ -100,6 +111,18 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   async function onDelete() {
     await deleteLease(leaseId);
     router.push("/app/leases");
+  }
+
+  async function onInvite(email: string) {
+    setInviteError(null);
+    setInviteStatus(null);
+    try {
+      await inviteTenant(leaseId, email);
+      setInviteStatus(`Invitation sent to ${email}`);
+      setJoined(await listLeaseTenants(leaseId));
+    } catch (err) {
+      setInviteError(err instanceof ApiError ? err.message : "Invite failed");
+    }
   }
 
   return (
@@ -259,6 +282,49 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
               Delete
             </button>
           </div>
+
+          <section className="mt-8">
+            <h2 className="mb-2 font-semibold">Tenants</h2>
+            {inviteStatus && <p className="mb-2 text-sm text-green-700">{inviteStatus}</p>}
+            {inviteError && (
+              <p className="mb-2 text-sm text-red-600" role="alert">
+                {inviteError}
+              </p>
+            )}
+            <ul className="space-y-2">
+              {[
+                { name: lease.tenant_name, email: lease.tenant_email },
+                ...lease.co_tenants.map((c) => ({ name: c.name, email: c.email })),
+              ].map((r) => (
+                <li
+                  key={r.email}
+                  className="flex items-center justify-between rounded border p-2 text-sm"
+                >
+                  <span>
+                    {r.name} <span className="text-gray-500">({r.email})</span>
+                  </span>
+                  <button
+                    onClick={() => onInvite(r.email)}
+                    className="rounded border px-2 py-1 text-blue-600 transition hover:bg-blue-50"
+                  >
+                    Invite
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {joined.length > 0 && (
+              <div className="mt-3">
+                <p className="text-sm font-semibold text-gray-700">Joined</p>
+                <ul className="mt-1 space-y-1 text-sm text-gray-700">
+                  {joined.map((t) => (
+                    <li key={t.email}>
+                      {t.name} — {t.email}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
         </>
       )}
 

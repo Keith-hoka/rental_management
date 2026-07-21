@@ -1,0 +1,36 @@
+import { apiFetch } from "@/lib/api";
+
+export interface LeaseTenantInfo {
+  name: string;
+  email: string;
+}
+
+export interface TenantLease {
+  id: string;
+  property_address: string;
+  rent_amount: number;
+  rent_frequency: "weekly" | "fortnightly" | "monthly";
+  start_date: string;
+  end_date: string;
+  bond_amount: number | null;
+  notice_period_days: number | null;
+  state: "active" | "upcoming" | "ended";
+  landlord_name: string;
+  landlord_email: string;
+  landlord_phone: string | null;
+}
+
+export function inviteTenant(leaseId: string, email: string) {
+  return apiFetch<unknown>(`/api/v1/leases/${leaseId}/invite`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function listLeaseTenants(leaseId: string) {
+  return apiFetch<LeaseTenantInfo[]>(`/api/v1/leases/${leaseId}/tenants`);
+}
+
+export function listMyLeases() {
+  return apiFetch<TenantLease[]>("/api/v1/me/leases");
+}
