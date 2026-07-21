@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     reminder_thresholds: list[int] = [60, 30, 7]
     reminder_hour: int = 8
 
+    # Rent charges: daily generation job lead time (days before due) and run hour.
+    charge_lead_days: int = 7
+    charge_generation_hour: int = 6
+
     # Directory where uploaded property images are stored (served at /uploads).
     upload_dir: str = "uploads"
 

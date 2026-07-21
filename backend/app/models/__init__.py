@@ -1,3 +1,4 @@
+from app.models.charge import Charge
 from app.models.invitation import Invitation, InvitationStatus
 from app.models.lease import Lease, LeaseFrequency
 from app.models.lease_reminder import LeaseReminder
@@ -7,6 +8,7 @@ from app.models.property import Property, PropertyStatus, PropertyType
 from app.models.user import User
 
 __all__ = [
+    "Charge",
     "Invitation",
     "InvitationStatus",
     "Lease",
