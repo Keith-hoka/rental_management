@@ -13,6 +13,7 @@ import {
   type LeaseInput,
 } from "@/lib/leases";
 import { getProperty, type Property } from "@/lib/properties";
+import { listLeaseCharges, type ChargeInfo } from "@/lib/charges";
 import { TenantFields } from "@/app/app/leases/TenantFields";
 import {
   inviteTenant,
@@ -46,6 +47,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [joined, setJoined] = useState<LeaseTenantInfo[]>([]);
   const [pending, setPending] = useState<LeaseInvitationInfo[]>([]);
   const [reminders, setReminders] = useState<LeaseReminderInfo[]>([]);
+  const [charges, setCharges] = useState<ChargeInfo[]>([]);
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -86,6 +88,13 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       })
       .catch(() => {
         if (active) setReminders([]);
+      });
+    listLeaseCharges(leaseId)
+      .then((c) => {
+        if (active) setCharges(c);
+      })
+      .catch(() => {
+        if (active) setCharges([]);
       });
     return () => {
       active = false;
@@ -386,6 +395,29 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                   <li key={i}>
                     {r.threshold_days}-day reminder - sent{" "}
                     {new Date(r.sent_at).toLocaleDateString()}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-8">
+            <h2 className="mb-2 font-semibold">Rent charges</h2>
+            {charges.length === 0 ? (
+              <p className="text-sm text-gray-500">No charges yet.</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-gray-700">
+                {charges.map((c) => (
+                  <li key={c.id} className="flex justify-between">
+                    <span>
+                      {c.period_start} – {c.period_end} · due {c.due_date}
+                      {new Date(c.due_date) > new Date() && (
+                        <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
+                          Upcoming
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-medium text-gray-800">${c.amount_due}</span>
                   </li>
                 ))}
               </ul>
