@@ -13,6 +13,9 @@ export interface MaintenanceInfo {
   image_urls: string[];
   reported_by: string;
   created_at: string;
+  contractor_id: string | null;
+  contractor_name: string | null;
+  contractor_phone: string | null;
 }
 
 export interface MaintenanceCreateBody {
@@ -68,5 +71,18 @@ export function updateMaintenance(
   return apiFetch<MaintenanceInfo>(`/api/v1/maintenance/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
+  });
+}
+
+export function assignContractor(requestId: string, contractorId: string) {
+  return apiFetch<MaintenanceInfo>(`/api/v1/maintenance/${requestId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ contractor_id: contractorId }),
+  });
+}
+
+export function unassignContractor(requestId: string) {
+  return apiFetch<MaintenanceInfo>(`/api/v1/maintenance/${requestId}/assign`, {
+    method: "DELETE",
   });
 }

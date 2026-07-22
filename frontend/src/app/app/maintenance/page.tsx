@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import {
+  assignContractor,
   listMaintenance,
+  unassignContractor,
   updateMaintenance,
   type MaintenanceInfo,
   type MaintenancePriority,
   type MaintenanceStatus,
 } from "@/lib/maintenance";
+import { listContractors, type ContractorInfo } from "@/lib/contractors";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
 import { Badge, DataList, DataRow, EmptyState, PageHeader, Select } from "@/components/ui";
@@ -33,7 +36,19 @@ const PRIORITY_TONES: Record<MaintenancePriority, "danger" | "warning" | "neutra
 export default function MaintenancePage() {
   const { me, unread, logOut } = useShell();
   const [requests, setRequests] = useState<MaintenanceInfo[]>([]);
+  const [contractors, setContractors] = useState<ContractorInfo[]>([]);
   const [filter, setFilter] = useState<MaintenanceStatus | "">("");
+
+  useEffect(() => {
+    if (!me) return;
+    let active = true;
+    listContractors()
+      .then((c) => active && setContractors(c))
+      .catch(() => active && setContractors([]));
+    return () => {
+      active = false;
+    };
+  }, [me]);
 
   useEffect(() => {
     if (!me) return;
@@ -51,6 +66,13 @@ export default function MaintenancePage() {
     body: { status?: MaintenanceStatus; priority?: MaintenancePriority },
   ) {
     await updateMaintenance(id, body);
+    setRequests(await listMaintenance(filter || undefined));
+  }
+
+  // One select does both directions: a name assigns, "Unassigned" clears.
+  async function onAssign(id: string, contractorId: string) {
+    if (contractorId) await assignContractor(id, contractorId);
+    else await unassignContractor(id);
     setRequests(await listMaintenance(filter || undefined));
   }
 
@@ -130,7 +152,26 @@ export default function MaintenancePage() {
                   </option>
                 ))}
               </Select>
+              <Select
+                aria-label="Contractor"
+                value={m.contractor_id ?? ""}
+                onChange={(e) => onAssign(m.id, e.target.value)}
+                className="w-48"
+              >
+                <option value="">Unassigned</option>
+                {contractors.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
             </div>
+            {m.contractor_name && (
+              <p className="mt-2 text-xs text-muted">
+                Assigned to {m.contractor_name}
+                {m.contractor_phone ? ` (${m.contractor_phone})` : ""}
+              </p>
+            )}
           </DataRow>
         ))}
         {requests.length === 0 && (

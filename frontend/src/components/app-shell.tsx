@@ -12,6 +12,7 @@ const MANAGE = [
   { href: "/app/tenants", label: "Tenants" },
   { href: "/app/payments", label: "Payments" },
   { href: "/app/maintenance", label: "Maintenance" },
+  { href: "/app/contractors", label: "Contractors" },
   { href: "/app/messages", label: "Messages" },
   { href: "/app/team", label: "Team" },
 ];

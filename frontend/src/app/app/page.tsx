@@ -249,6 +249,12 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-muted">{m.description}</p>
+                      {m.contractor_name && (
+                        <p className="mt-1 text-sm text-text">
+                          Contractor: {m.contractor_name}
+                          {m.contractor_phone ? ` (${m.contractor_phone})` : ""}
+                        </p>
+                      )}
                       {m.image_urls.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {m.image_urls.map((u) => (
