@@ -8,6 +8,7 @@ from app.models.maintenance import (
     MaintenanceRequest,
     MaintenanceStatus,
 )
+from app.models.notification import Notification
 from app.models.organization import Membership, Organization, Role
 from app.models.payment import Payment, PaymentMethod
 from app.models.property import Property, PropertyStatus, PropertyType
@@ -25,6 +26,7 @@ __all__ = [
     "MaintenanceRequest",
     "MaintenanceStatus",
     "Membership",
+    "Notification",
     "Organization",
     "Payment",
     "PaymentMethod",
