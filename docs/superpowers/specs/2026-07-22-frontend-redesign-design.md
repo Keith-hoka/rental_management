@@ -1,0 +1,235 @@
+# Frontend Redesign — Design
+
+**Date:** 2026-07-22
+**Status:** Approved (pending spec review)
+
+## Goal
+
+Replace the hand-rolled utility-class markup across all 20 pages with a small indigo design system:
+semantic color tokens, a shared component library, a sidebar app shell for managers, a single-column
+shell for tenants, and a working dark mode.
+
+## Architecture
+
+Three layers, each usable on its own:
+
+1. **Tokens** — semantic CSS custom properties in `globals.css` (`--color-canvas`, `--color-surface`,
+   `--color-border`, `--color-text`, `--color-muted`, `--color-brand`, ...) exposed to Tailwind v4
+   through `@theme inline`. Components write `bg-surface text-text`, never `bg-white dark:bg-gray-900`.
+2. **Components** — `src/components/ui/`, one file per component. Pages compose these instead of
+   repeating utility strings.
+3. **Shells** — `AppShell` (sidebar + top bar) for manager pages, `PortalShell` (centered single
+   column) for tenants.
+
+The token layer is what makes dark mode affordable: dark is one `[data-theme="dark"]` block
+overriding variable values, not a second variant on every element. Without it, a full dark mode
+would roughly double the markup on every page.
+
+## Tech Stack
+
+Next.js 16.2.10 App Router, React 19, Tailwind v4 (CSS-first `@theme`, no config file), Recharts
+3.10. No new dependencies.
+
+## Global Constraints
+
+- No emojis in code.
+- Short, focused files; one component per file.
+- Frontend checks: `npm run lint`, `npm run build`, `npx playwright test --workers=1` from `frontend/`.
+- Backend ruff sequence still runs before every push, from `backend/`:
+  `uv run ruff format .` -> `uv run ruff check --fix .` -> `uv run ruff check .` -> `uv run ruff format --check .`
+- Each task ends with: lint + build + affected e2e -> commit -> push (CI) -> report -> wait.
+- **Every user-visible accessible name in the inventory below is preserved exactly.**
+
+## Confirmed Decisions
+
+1. **Accent: indigo/blue-violet**, from reference image 3.
+2. **Manager pages get a persistent left sidebar**, from the desktop reference.
+3. **Tenants get a single-column card layout, no sidebar** — a tenant has one lease and three nav
+   destinations; a sidebar for three links is wasted chrome.
+4. **Dark mode is fully implemented**, not dropped.
+
+## Design Tokens
+
+Declared on `:root`, overridden under `[data-theme="dark"]`, and mirrored by a
+`@media (prefers-color-scheme: dark)` block guarded to `:root:not([data-theme="light"])` so the
+system preference applies until the user chooses explicitly.
+
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `--color-canvas` | `#F6F7FB` | `#0F1117` | page background |
+| `--color-surface` | `#FFFFFF` | `#171A23` | cards, sidebar, inputs |
+| `--color-surface-2` | `#F1F2F7` | `#1F2330` | table header, hover rows |
+| `--color-border` | `#E6E8F0` | `#262A36` | hairlines |
+| `--color-text` | `#12141C` | `#E8EAF0` | primary text |
+| `--color-muted` | `#6B7280` | `#9BA1B0` | labels, captions |
+| `--color-brand` | `#4F46E5` | `#6366F1` | primary actions, active nav, chart bars |
+| `--color-brand-hover` | `#4338CA` | `#818CF8` | hover |
+| `--color-brand-soft` | `#EEF2FF` | `#242943` | active nav pill, info badge |
+| `--color-brand-on-soft` | `#3730A3` | `#C7D2FE` | text on `brand-soft` |
+| `--color-success` / `-soft` / `-on-soft` | `#16A34A` / `#DCFCE7` / `#14532D` | `#4ADE80` / `#14532D` / `#BBF7D0` | paid, available |
+| `--color-warning` / `-soft` / `-on-soft` | `#D97706` / `#FEF3C7` / `#78350F` | `#FBBF24` / `#78350F` / `#FDE68A` | partial, pending |
+| `--color-danger` / `-soft` / `-on-soft` | `#DC2626` / `#FEE2E2` / `#7F1D1D` | `#F87171` / `#7F1D1D` / `#FECACA` | overdue, destructive |
+
+The brand hue lightens in dark mode (`#4F46E5` -> `#6366F1`) because the light-mode indigo loses
+contrast against a near-black canvas. Status colors invert their pairing in dark mode — dark fill
+with light text — rather than reusing the light-mode tint.
+
+Radii: `12px` cards, `8px` controls, `999px` pills. Shadow: a single soft
+`0 1px 2px rgb(16 20 40 / 0.04), 0 4px 12px rgb(16 20 40 / 0.06)` in light, suppressed in dark
+(dark surfaces separate by value, and shadows on dark read as smudges).
+
+## Dark Mode Mechanism
+
+- `<html>` carries `data-theme` when the user has chosen; absent means follow the system.
+- A `ThemeToggle` component cycles light / dark / system and persists to `localStorage`.
+- A small inline script in `layout.tsx` reads `localStorage` before paint and sets the attribute, so
+  a dark-mode user never sees a white flash.
+- `layout.tsx` also gains `<meta name="color-scheme" content="light dark">` so native form controls
+  and scrollbars match.
+
+## Fixes Folded In
+
+`globals.css` currently sets `font-family: Arial` on `body`, overriding the Geist font the layout
+loads — the app has never actually rendered in Geist. That line goes, replaced by the `--font-sans`
+token. `layout.tsx` metadata still reads "Create Next App" / "Generated by create next app"; it
+becomes the product title and description.
+
+## Components (`src/components/ui/`)
+
+| Component | Shape |
+| --- | --- |
+| `Button` | `variant: "primary" \| "secondary" \| "ghost" \| "danger"`, `size: "sm" \| "md"`, renders `<button>`; passes through `type`, `onClick`, `disabled` |
+| `Card` | surface + border + radius + padding wrapper; optional `title` rendering an `<h2>` |
+| `StatCard` | `label`, `value`, optional `tone: "default" \| "danger"` |
+| `Field` | `<label>` + control wrapper; keeps the label text and the control's placeholder verbatim |
+| `Input` / `Select` / `Textarea` | token-styled form controls, all props passed through; all three live in `input.tsx` |
+| `Badge` | `tone: "neutral" \| "brand" \| "success" \| "warning" \| "danger"`, pill shaped |
+| `PageHeader` | `title` as `<h1>` plus an optional actions slot |
+| `EmptyState` | muted centered message; used for every "No … yet." string |
+| `DataList` | bordered row list wrapper used where the app shows records; horizontal overflow scrolls inside itself |
+| `ThemeToggle` | light / dark / system cycle |
+
+Pages import from `@/components/ui`. No page keeps a bare `rounded border px-3 py-1` string.
+
+## Shells
+
+**`AppShell`** wraps every manager page under `/app`:
+
+- a fixed left sidebar, `<nav aria-label="Main">`, containing the product mark, a **Manage** group
+  (Dashboard, Properties, Leases, Maintenance, Messages with its unread count, Team) and a
+  **Settings** group (Contact info, Change password, Log out, theme toggle);
+- a top bar with the current user's name and role;
+- **exactly one `<main>`**, owned by the shell. Pages stop rendering their own `<main>` element —
+  nested `<main>` is invalid and would make `getByRole("main")` ambiguous.
+
+**`PortalShell`** wraps tenant pages: centered single column, a compact header with the tenant's
+name, and a link row for Messages / Contact info / Change password / Log out. Same tokens, same
+components, no sidebar. It owns its `<main>` on the same rule as `AppShell`, so a tenant page never
+renders a second one.
+
+The dashboard chooses its shell from the role already fetched from `/auth/me`.
+
+## Playwright Strict-Mode Collisions
+
+The sidebar puts Properties / Leases / Maintenance / Messages / Team / Contact info / Change
+password on **every** manager page. Where a page already contains an in-page link of the same name,
+the page now has two matches and Playwright's strict mode fails the locator.
+
+Known case: the property detail page has a "Leases" link, queried by `getByRole("link", { name: "Leases" })`.
+
+**Resolution:** the shell's nav is `<nav aria-label="Main">` and page content lives in the shell's
+`<main>`. Affected specs scope the locator to the landmark:
+`page.getByRole("main").getByRole("link", { name: "Leases" })`. No user-visible text is renamed —
+the 13 e2e specs pin the interface by accessible name, so renaming is the riskier move, and adding
+landmarks is an accessibility improvement in its own right.
+
+Each page task re-checks its own page for collisions rather than trusting this list: grep the page
+for link text matching a shell nav item, and scope that spec's locator if one is found.
+
+## Preserved Accessible Names
+
+Every one of these must still resolve after the redesign.
+
+- **Placeholders:** `Your name`, `Organization name`, `Email`, `Password (min 8 chars)`, `Password`,
+  `Current password`, `New password (min 8 chars)`, `Confirm new password`, `Address` (exact),
+  `Amount`, `Email to invite`, `Tenant name`, `Tenant email`, `Tenant phone (optional)`,
+  `Phone (optional)`
+- **Labels:** `Bedrooms`, `Bond (optional)`, `Rent`, `Start`, `End`, `Property`, `Payment date`,
+  `Notice period (days)`, `Upload image`, `Co-tenant 1 name`, `Co-tenant 1 email`,
+  `Co-tenant 1 phone`
+- **Buttons:** `Sign up`, `Log in`, `Log out`, `Send reset link`, `Update password`, `Save`, `Edit`,
+  `Delete`, `Yes, delete`, `Create property`, `Delete property`, `Add lease`, `Add co-tenant`,
+  `Record payment`, `Invite`, `Revoke`
+- **Headings:** `Messages`, `Maintenance`, `Rent charges`, `Monthly income`, `Expiry reminders`
+- **Links:** `Properties`, `Leases`, `Maintenance`, `Messages`, `Team`, `Contact info`,
+  `Change password`, `Forgot password?`, and property-address links
+- **Test ids:** `welcome`
+- **Alt text:** `Property`
+- **Copy asserted by tests:** `No messages yet.`, `No maintenance requests yet.`
+
+## Charts
+
+The Recharts bar currently hardcodes `fill="#2563eb"`. It becomes `fill="var(--color-brand)"` — SVG
+`fill` resolves CSS custom properties, so the chart follows the theme with no JS. Axis and tooltip
+text take `--color-muted` and `--color-surface` the same way.
+
+## Page Treatment
+
+- **Marketing `/`** — centered hero card, product name, one primary CTA to sign up, secondary to log in.
+- **Auth pages** (login, signup, forgot-password, reset-password, accept-invite) — centered `Card`
+  on the canvas, product mark above, `Field` + `Input` stack, full-width primary `Button`.
+- **Dashboard (manager)** — `PageHeader`, a `StatCard` grid, the monthly income `Card` with the
+  chart. The nav links currently sitting at the bottom of this page move into the sidebar.
+- **Dashboard (tenant)** — `PortalShell`: lease `Card`s with rent, dates, landlord contact, an
+  outstanding/overdue pair, the charges list, and the maintenance report form in its own `Card`.
+- **Properties** — list as `Card` rows with thumbnail, address and status `Badge`; new/edit as
+  `Field` stacks; detail with an image strip.
+- **Leases** — list of `Card` rows; new as a sectioned form; detail keeps its sections (roster,
+  tenants, payments, rent charges, expiry reminders) each in its own `Card` with `Badge` status.
+- **Maintenance** — filter `Select` in the `PageHeader`, request rows with priority and status `Badge`s.
+- **Messages** — unread rows keep the dot and weight; category filter in the header; `EmptyState`.
+- **Team / Profile / Change password** — `Card` + `Field` stacks.
+
+## Testing
+
+No new e2e specs. The existing 13 must keep passing, with locator scoping only where the sidebar
+introduces a genuine duplicate. Each task runs `npm run lint`, `npm run build`, and the e2e specs
+covering the pages it touched; the final task runs the full suite serially
+(`npx playwright test --workers=1`) plus a manual pass over both themes.
+
+## Sequencing
+
+Each step ships green on its own.
+
+1. Tokens, `globals.css`, font fix, metadata
+2. Component library (no page consumes it yet)
+3. `AppShell` + sidebar + collision resolution + manager dashboard
+4. Marketing and auth pages
+5. Properties pages
+6. Leases pages
+7. Maintenance, Messages, Team
+8. Profile, change-password, tenant `PortalShell`
+9. `ThemeToggle`, dark-mode pass, full e2e
+
+Step 3 is the first visible result; review it on localhost before the remaining pages roll out.
+
+## Out of Scope
+
+- Mobile bottom-tab navigation and a mobile-specific layout. The shells stay responsive (the sidebar
+  collapses to a top row under `md`), but the phone-first navigation in the reference images is not
+  reproduced.
+- Features visible in the references that this product does not have: vendor directory, unit lists,
+  in-app chat, global search, CSV export, occupancy-rate charting.
+- Backend or API changes of any kind.
+- New e2e specs, visual-regression testing, and icon-set adoption (icons stay text-free until a
+  library is chosen).
+
+## File Structure
+
+- Modify: `frontend/src/app/globals.css`, `frontend/src/app/layout.tsx`
+- Create: `frontend/src/components/ui/` — `button.tsx`, `card.tsx`, `stat-card.tsx`, `field.tsx`,
+  `input.tsx`, `badge.tsx`, `page-header.tsx`, `empty-state.tsx`, `data-list.tsx`,
+  `theme-toggle.tsx`, `index.ts`
+- Create: `frontend/src/components/app-shell.tsx`, `frontend/src/components/portal-shell.tsx`
+- Modify: all 20 page files under `frontend/src/app`
+- Modify: only those `frontend/e2e/*.spec.ts` files with a genuine landmark collision
