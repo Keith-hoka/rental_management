@@ -3,11 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
 import { listMyLeases, type TenantLease } from "@/lib/tenants";
 import { listMyLeaseCharges, type ChargeInfo } from "@/lib/charges";
 import { getDashboardStats, type DashboardStats } from "@/lib/stats";
+import {
+  createMaintenance,
+  listLeaseMaintenance,
+  cancelMaintenance,
+  uploadMaintenanceImage,
+  type MaintenanceInfo,
+  type MaintenancePriority,
+} from "@/lib/maintenance";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface Me {
@@ -31,6 +39,10 @@ export default function DashboardPage() {
   const [myLeases, setMyLeases] = useState<TenantLease[]>([]);
   const [chargesByLease, setChargesByLease] = useState<Record<string, ChargeInfo[]>>({});
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [maintByLease, setMaintByLease] = useState<Record<string, MaintenanceInfo[]>>({});
+  const [issueTitle, setIssueTitle] = useState("");
+  const [issueDesc, setIssueDesc] = useState("");
+  const [issuePriority, setIssuePriority] = useState<MaintenancePriority>("medium");
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -54,6 +66,14 @@ export default function DashboardPage() {
               ),
             );
             if (active) setChargesByLease(Object.fromEntries(entries));
+            const maint = await Promise.all(
+              l.map((lease) =>
+                listLeaseMaintenance(lease.id)
+                  .then((m) => [lease.id, m] as const)
+                  .catch(() => [lease.id, []] as const),
+              ),
+            );
+            if (active) setMaintByLease(Object.fromEntries(maint));
           });
         }
         return getDashboardStats()
@@ -78,6 +98,24 @@ export default function DashboardPage() {
   function logOut() {
     clearTokens();
     router.replace("/login");
+  }
+
+  async function refreshMaint(leaseId: string) {
+    const m = await listLeaseMaintenance(leaseId);
+    setMaintByLease((prev) => ({ ...prev, [leaseId]: m }));
+  }
+
+  async function reportIssue(leaseId: string, e: React.FormEvent) {
+    e.preventDefault();
+    await createMaintenance(leaseId, {
+      title: issueTitle,
+      description: issueDesc,
+      priority: issuePriority,
+    });
+    setIssueTitle("");
+    setIssueDesc("");
+    setIssuePriority("medium");
+    await refreshMaint(leaseId);
   }
 
   if (me.role === "tenant") {
@@ -122,6 +160,95 @@ export default function DashboardPage() {
                   ))}
                 </ul>
               )}
+              <div className="mt-3">
+                <p className="font-medium text-gray-800">Maintenance</p>
+                <form onSubmit={(e) => reportIssue(l.id, e)} className="mt-1 flex flex-wrap gap-2">
+                  <input
+                    required
+                    placeholder="Issue title"
+                    value={issueTitle}
+                    onChange={(e) => setIssueTitle(e.target.value)}
+                    className="w-40 rounded border px-2 py-1 text-sm"
+                  />
+                  <input
+                    required
+                    placeholder="Description"
+                    value={issueDesc}
+                    onChange={(e) => setIssueDesc(e.target.value)}
+                    className="flex-1 rounded border px-2 py-1 text-sm"
+                  />
+                  <select
+                    aria-label="Priority"
+                    value={issuePriority}
+                    onChange={(e) => setIssuePriority(e.target.value as MaintenancePriority)}
+                    className="rounded border px-2 py-1 text-sm"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
+                  >
+                    Report
+                  </button>
+                </form>
+                <ul className="mt-2 space-y-1">
+                  {(maintByLease[l.id] ?? []).map((m) => (
+                    <li key={m.id} className="rounded border p-2">
+                      <span className="font-medium text-gray-800">{m.title}</span>{" "}
+                      <span className="text-xs text-gray-500">
+                        {m.priority} · {m.status}
+                      </span>
+                      <p className="text-gray-600">{m.description}</p>
+                      {m.image_urls.length > 0 && (
+                        <div className="mt-1 flex gap-1">
+                          {m.image_urls.map((u) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={u}
+                              src={`${API_BASE_URL}${u}`}
+                              alt=""
+                              className="h-12 w-12 rounded object-cover"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-1 flex items-center gap-3">
+                        <label className="cursor-pointer text-xs text-blue-600">
+                          Add image
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            aria-label="Add maintenance image"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                await uploadMaintenanceImage(m.id, file);
+                                await refreshMaint(l.id);
+                              }
+                            }}
+                          />
+                        </label>
+                        {(m.status === "open" || m.status === "in_progress") && (
+                          <button
+                            onClick={async () => {
+                              await cancelMaintenance(m.id);
+                              await refreshMaint(l.id);
+                            }}
+                            className="text-xs text-red-600"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </li>
           ))}
           {myLeases.length === 0 && <li className="text-gray-500">No lease yet.</li>}
