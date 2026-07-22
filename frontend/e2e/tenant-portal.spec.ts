@@ -87,11 +87,42 @@ test("a tenant accepts an invite and uses the portal", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Update password" })).toBeVisible();
 
   // Narrow: the portal nav collapses the same way the manager sidebar does.
-  // Resizing here reuses this tenant rather than onboarding a second one.
+  // Resizing here reuses this tenant rather than onboarding a second one. Back
+  // on the dashboard first because it is the one portal page long enough at
+  // this size to give the scroll-lock assertions below something to bite on.
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "8 Portal Street" })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   const menu = page.getByRole("button", { name: "Menu" });
   await expect(menu).toBeVisible();
   await expect(nav.getByRole("link", { name: "Profile" })).toBeHidden();
   await menu.click();
   await expect(nav.getByRole("link", { name: "Profile" })).toBeVisible();
+
+  // The lock is a second copy of the one in AppShell, so it needs its own
+  // coverage. mouse.wheel, not scrollTo: overflow:hidden blocks the user's
+  // scroll but not a scripted one, so a scripted scroll proves nothing.
+  await menu.click();
+  await expect(nav.getByRole("link", { name: "Profile" })).toBeHidden();
+  await page.mouse.move(195, 400);
+  await page.mouse.wheel(0, 400);
+  // Control. Without it a stationary page would satisfy the real assertion
+  // below for the wrong reason, and the test would pass with no lock at all.
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+  await page.mouse.wheel(0, -400);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await menu.click();
+  await expect(nav.getByRole("link", { name: "Profile" })).toBeVisible();
+  await page.mouse.wheel(0, 400);
+  // Settle, then assert once. expect.poll is wrong for proving absence: it
+  // succeeds on its first sample, which lands before the wheel has been
+  // applied, so it passes and never retries.
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
+  expect(
+    await page.evaluate(() =>
+      Math.round(document.querySelector("header")!.getBoundingClientRect().top),
+    ),
+  ).toBe(0);
 });

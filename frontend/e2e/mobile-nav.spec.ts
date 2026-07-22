@@ -31,14 +31,29 @@ test("the sidebar collapses behind a menu button on a narrow screen", async ({ p
   // must stay put — otherwise scrolling reveals the page through the gap above
   // the drawer. mouse.wheel, not scrollTo: overflow:hidden blocks the user's
   // scroll but not a scripted one, so a scripted scroll proves nothing here.
+  await menu.click();
+  await expect(menu).toHaveAttribute("aria-expanded", "false");
   await page.mouse.move(195, 400);
   await page.mouse.wheel(0, 400);
-  await expect
-    .poll(() => page.evaluate(() => Math.round(window.scrollY)))
-    .toBe(0);
-  await expect
-    .poll(() => page.evaluate(() => Math.round(document.querySelector("header")!.getBoundingClientRect().top)))
-    .toBe(0);
+  // Control. Without it a stationary page would satisfy the real assertion
+  // below for the wrong reason, and the test would pass with no lock at all.
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+  await page.mouse.wheel(0, -400);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await menu.click();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
+  await page.mouse.wheel(0, 400);
+  // Settle, then assert once. expect.poll is wrong for proving absence: it
+  // succeeds on its first sample, which lands before the wheel has been
+  // applied, so it passes and never retries.
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
+  expect(
+    await page.evaluate(() =>
+      Math.round(document.querySelector("header")!.getBoundingClientRect().top),
+    ),
+  ).toBe(0);
 
   // Choosing a destination navigates and puts the menu away again.
   await nav.getByRole("link", { name: "Properties" }).click();
