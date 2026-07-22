@@ -3,6 +3,11 @@ from app.models.invitation import Invitation, InvitationStatus
 from app.models.lease import Lease, LeaseFrequency
 from app.models.lease_reminder import LeaseReminder
 from app.models.lease_tenant import LeaseTenant
+from app.models.maintenance import (
+    MaintenancePriority,
+    MaintenanceRequest,
+    MaintenanceStatus,
+)
 from app.models.organization import Membership, Organization, Role
 from app.models.payment import Payment, PaymentMethod
 from app.models.property import Property, PropertyStatus, PropertyType
@@ -16,6 +21,9 @@ __all__ = [
     "LeaseFrequency",
     "LeaseReminder",
     "LeaseTenant",
+    "MaintenancePriority",
+    "MaintenanceRequest",
+    "MaintenanceStatus",
     "Membership",
     "Organization",
     "Payment",
