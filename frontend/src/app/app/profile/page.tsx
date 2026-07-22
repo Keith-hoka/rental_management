@@ -58,7 +58,7 @@ export default function ProfilePage() {
   return (
     <Shell me={user} unread={unread} onLogOut={logOut}>
       <div className="mx-auto max-w-lg">
-        <PageHeader title="Contact info" />
+        <PageHeader title="Profile" />
         {error && (
           <p className="mb-3 text-sm text-danger" role="alert">
             {error}
@@ -111,7 +111,7 @@ export default function ProfilePage() {
                     </div>
                   ))}
                 </dl>
-                <Button variant="secondary" className="mt-4 w-full" onClick={startEdit}>
+                <Button className="mt-4 w-full" onClick={startEdit}>
                   Edit
                 </Button>
               </>

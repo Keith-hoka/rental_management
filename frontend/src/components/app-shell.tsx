@@ -16,7 +16,7 @@ const MANAGE = [
 ];
 
 const SETTINGS = [
-  { href: "/app/profile", label: "Contact info" },
+  { href: "/app/profile", label: "Profile" },
   { href: "/app/change-password", label: "Change password" },
 ];
 

@@ -11,7 +11,7 @@ test("a user can edit their contact info", async ({ page }) => {
   await page.getByRole("button", { name: "Sign up" }).click();
   await expect(page.getByTestId("welcome")).toBeVisible();
 
-  await page.getByRole("link", { name: "Contact info" }).click();
+  await page.getByRole("link", { name: "Profile" }).click();
   await expect(page).toHaveURL(/\/app\/profile$/);
   // The view shows the info; Edit opens the form.
   await page.getByRole("button", { name: "Edit" }).click();

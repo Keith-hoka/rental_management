@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 const LINKS = [
   { href: "/app", label: "Dashboard" },
   { href: "/app/messages", label: "Messages" },
-  { href: "/app/profile", label: "Contact info" },
+  { href: "/app/profile", label: "Profile" },
   { href: "/app/change-password", label: "Change password" },
 ];
 
