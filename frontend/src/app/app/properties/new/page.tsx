@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { createProperty, uploadPropertyImage, type PropertyInput } from "@/lib/properties";
 import { AppShell } from "@/components/app-shell";
@@ -126,11 +127,25 @@ export default function NewPropertyPage() {
               <p className="mt-1 text-sm text-muted">{files.length} image(s) selected</p>
             )}
           </div>
-          <Button type="submit" className="w-full">
-            Create property
-          </Button>
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1">
+              Create property
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => router.push("/app/properties")}
+            >
+              Cancel
+            </Button>
+          </div>
         </form>
       </Card>
+      <p className="mx-auto mt-4 max-w-2xl">
+        <Link href="/app/properties" className="text-brand">
+          Back
+        </Link>
+      </p>
     </AppShell>
   );
 }

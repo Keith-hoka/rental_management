@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import {
   deleteProperty,
@@ -185,24 +186,41 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   />
                 </label>
               </div>
-              <Button type="submit" className="w-full">
-                Save
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => router.push("/app/properties")}
+                >
+                  Cancel
+                </Button>
+              </div>
             </form>
-            <Button
-              variant="danger"
-              onClick={() => setConfirming(true)}
-              className="mt-3 w-full"
-            >
+            <Button variant="danger" onClick={() => setConfirming(true)} className="mt-3 w-full">
               Delete property
             </Button>
           </Card>
+          <p className="mx-auto mt-4 max-w-2xl">
+            <Link href="/app/properties" className="text-brand">
+              Back
+            </Link>
+          </p>
         </>
       )}
 
       {confirming && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg">
+          {/* A real dialog: the form behind it also has a Cancel button, and the
+              role is what keeps the two distinguishable. */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete property"
+            className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg"
+          >
             <p className="mb-4 text-text">Delete this property? This cannot be undone.</p>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
