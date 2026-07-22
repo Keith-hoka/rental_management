@@ -7,7 +7,16 @@ import { ApiError } from "@/lib/api";
 import { createProperty, uploadPropertyImage, type PropertyInput } from "@/lib/properties";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
-import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Textarea,
+  linkButtonOutline,
+} from "@/components/ui";
 
 const EMPTY: PropertyInput = {
   address: "",
@@ -138,7 +147,7 @@ export default function NewPropertyPage() {
             onChange={(e) => set("description", e.target.value)}
           />
           <div>
-            <label className="inline-block cursor-pointer rounded-lg border border-border px-3 py-2 text-sm text-brand hover:bg-brand-soft">
+            <label className={`${linkButtonOutline} cursor-pointer`}>
               Upload images
               <input
                 type="file"

@@ -16,7 +16,7 @@ import {
   PageHeader,
   StatCard,
   linkButton,
-  linkButtonGhost,
+  linkButtonOutline,
 } from "@/components/ui";
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -135,7 +135,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   </p>
                   <Link
                     href={`/app/leases/${prop.active_lease.id}`}
-                    className={`${linkButtonGhost} mt-3 -ml-3`}
+                    className={`${linkButtonOutline} mt-3`}
                   >
                     Open lease
                   </Link>
