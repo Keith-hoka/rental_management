@@ -70,7 +70,15 @@ test("a tenant accepts an invite and uses the portal", async ({ page }) => {
   await expect(page.getByText("Leaking tap")).toBeVisible();
   await expect(page.getByText("Kitchen tap drips overnight")).toBeVisible();
 
-  // Profile and change-password render inside the same portal shell.
+  // Every page a tenant can reach keeps the portal shell — no manager sidebar.
+  await nav.getByRole("link", { name: "Messages" }).click();
+  await expect(page).toHaveURL(/\/app\/messages$/);
+  // Anchor on the new page having rendered first: a toHaveCount(0) fired
+  // mid-navigation passes against a momentarily empty nav and never retries.
+  await expect(page.getByRole("heading", { name: "Messages" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Properties" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Team" })).toHaveCount(0);
+
   await nav.getByRole("link", { name: "Profile" }).click();
   await expect(page).toHaveURL(/\/app\/profile$/);
   await expect(page.getByText(tenant)).toBeVisible();

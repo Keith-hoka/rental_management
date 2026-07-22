@@ -10,8 +10,11 @@ const VARIANTS: Record<Variant, string> = {
   danger: "border border-border bg-surface text-danger hover:bg-danger-soft",
 };
 
+// whitespace-nowrap + shrink-0: as a flex item a button is shrinkable by
+// default, which squeezes its label onto several lines instead of keeping the
+// control intact.
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50";
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors disabled:opacity-50";
 
 /**
  * Shared classes for a Link that acts as a page's primary action, so those

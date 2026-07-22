@@ -9,6 +9,7 @@ import {
   type NotificationInfo,
 } from "@/lib/notifications";
 import { AppShell } from "@/components/app-shell";
+import { PortalShell } from "@/components/portal-shell";
 import { useShell } from "@/components/use-shell";
 import { Button, DataList, DataRow, EmptyState, PageHeader, Select } from "@/components/ui";
 
@@ -43,14 +44,19 @@ export default function MessagesPage() {
 
   const shown = filter ? items.filter((n) => n.category.startsWith(filter)) : items;
   const unreadCount = items.filter((n) => n.read_at === null).length;
+  // Both roles have messages, so the shell follows the role, as on profile
+  // and change-password.
+  const Shell = me.role === "tenant" ? PortalShell : AppShell;
 
   return (
-    <AppShell me={me} unread={unread} onLogOut={logOut}>
+    <Shell me={me} unread={unread} onLogOut={logOut}>
       <PageHeader
         title="Messages"
         actions={
           <>
-            <span className="text-sm text-muted">{unreadCount} unread</span>
+            <span className="shrink-0 text-sm text-muted whitespace-nowrap">
+              {unreadCount} unread
+            </span>
             <Select
               aria-label="Filter category"
               value={filter}
@@ -117,6 +123,6 @@ export default function MessagesPage() {
           </DataRow>
         )}
       </DataList>
-    </AppShell>
+    </Shell>
   );
 }
