@@ -16,6 +16,7 @@ import {
   PageHeader,
   StatCard,
   linkButton,
+  linkButtonSecondary,
 } from "@/components/ui";
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -82,14 +83,16 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             />
 
             {prop.image_urls.length > 0 && (
-              <div className="mb-5 flex flex-wrap gap-2">
+              // auto-fit: a lone photo fills the row and lines up with the cards
+              // below, while several share it.
+              <div className="mb-5 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
                 {prop.image_urls.map((url) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={url}
                     src={imageSrc(url)}
                     alt="Property"
-                    className="h-40 w-56 rounded-xl object-cover"
+                    className="h-56 w-full rounded-xl object-cover"
                   />
                 ))}
               </div>
@@ -104,14 +107,11 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   tone={Number(balance?.overdue_amount ?? 0) > 0 ? "danger" : "default"}
                 />
                 <StatCard label="Open requests" value={String(open.length)} />
-                {/* Not a status card: the Tenancy badge below already says that. */}
+                {/* Not a status card: the Tenancy badge below already says that.
+                    The frequency lives in the label so the value stays short. */}
                 <StatCard
-                  label="Rent"
-                  value={
-                    prop.active_lease
-                      ? `$${prop.active_lease.rent_amount}/${prop.active_lease.rent_frequency}`
-                      : "—"
-                  }
+                  label={prop.active_lease ? `Rent / ${prop.active_lease.rent_frequency}` : "Rent"}
+                  value={prop.active_lease ? `$${prop.active_lease.rent_amount}` : "—"}
                 />
               </div>
               <p className="mt-3 text-sm text-muted">
@@ -133,11 +133,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   <p className="text-sm text-muted">
                     {prop.active_lease.start_date} to {prop.active_lease.end_date}
                   </p>
-                  <p className="mt-2">
-                    <Link href={`/app/leases/${prop.active_lease.id}`} className="text-brand">
-                      Open lease
-                    </Link>
-                  </p>
+                  <Link
+                    href={`/app/leases/${prop.active_lease.id}`}
+                    className={`${linkButtonSecondary} mt-3`}
+                  >
+                    Open lease
+                  </Link>
                 </>
               ) : (
                 <p className="text-sm text-muted">Vacant — no active lease.</p>
@@ -169,6 +170,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 )}
               </DataList>
             </Card>
+
+            <p className="mt-6">
+              <Link href="/app/properties" className="text-brand">
+                Back
+              </Link>
+            </p>
           </>
         )}
       </div>

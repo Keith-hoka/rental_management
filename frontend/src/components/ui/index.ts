@@ -1,4 +1,4 @@
-export { Button, linkButton } from "./button";
+export { Button, linkButton, linkButtonSecondary } from "./button";
 export { Card } from "./card";
 export { StatCard } from "./stat-card";
 export { Field } from "./field";
