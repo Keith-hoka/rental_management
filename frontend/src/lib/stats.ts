@@ -5,6 +5,18 @@ export interface MonthlyIncome {
   amount: number;
 }
 
+export interface OccupancyPoint {
+  month: string;
+  occupied: number;
+  total: number;
+  rate: number;
+}
+
+export interface MaintenanceStatusCount {
+  status: string;
+  count: number;
+}
+
 export interface DashboardStats {
   outstanding: number;
   overdue: number;
@@ -15,6 +27,8 @@ export interface DashboardStats {
   tenants: number;
   maintenance_open: number;
   monthly_income: MonthlyIncome[];
+  occupancy: OccupancyPoint[];
+  maintenance_by_status: MaintenanceStatusCount[];
 }
 
 export function getDashboardStats() {

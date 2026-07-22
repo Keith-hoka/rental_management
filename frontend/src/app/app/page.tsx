@@ -17,7 +17,19 @@ import {
   type MaintenanceInfo,
   type MaintenancePriority,
 } from "@/lib/maintenance";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { AppShell } from "@/components/app-shell";
 import { PortalShell } from "@/components/portal-shell";
 import { PaymentTable } from "@/components/payment-table";
@@ -43,6 +55,22 @@ interface Me {
   name: string;
   role: string;
 }
+
+// Tokens, never hex: Recharts' own hardcoded #ccc was already caught glowing on
+// a dark card, and any literal colour here would repeat that.
+const TOOLTIP_STYLE = {
+  background: "var(--surface)",
+  border: "1px solid var(--line)",
+  borderRadius: 12,
+  color: "var(--ink)",
+};
+
+const STATUS_FILL: Record<string, string> = {
+  open: "var(--brand)",
+  in_progress: "var(--warning)",
+  resolved: "var(--success)",
+  cancelled: "var(--line-strong)",
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -357,6 +385,53 @@ export default function DashboardPage() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+              </Card>
+              <Card title="Occupancy" className="mt-5">
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={stats.occupancy}>
+                    <XAxis dataKey="month" stroke="var(--ink-muted)" fontSize={12} />
+                    {/* Fixed 0-100: left to auto-scale, a drift from 95% to 92%
+                        is stretched into a cliff, which is the chart lying. */}
+                    <YAxis domain={[0, 100]} unit="%" stroke="var(--ink-muted)" fontSize={12} />
+                    <Tooltip
+                      cursor={{ stroke: "var(--surface-2)" }}
+                      contentStyle={TOOLTIP_STYLE}
+                      formatter={(value, _name, entry) =>
+                        `${value}% (${entry.payload.occupied} of ${entry.payload.total})`
+                      }
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="rate"
+                      stroke="var(--brand)"
+                      strokeWidth={2}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+              <Card title="Maintenance status" className="mt-5">
+                {stats.maintenance_by_status.every((s) => s.count === 0) ? (
+                  <EmptyState>No maintenance requests yet.</EmptyState>
+                ) : (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <PieChart>
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                      <Pie
+                        data={stats.maintenance_by_status}
+                        dataKey="count"
+                        nameKey="status"
+                        innerRadius={55}
+                        outerRadius={90}
+                        isAnimationActive={false}
+                      >
+                        {stats.maintenance_by_status.map((s) => (
+                          <Cell key={s.status} fill={STATUS_FILL[s.status]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </Card>
             </>
           )}

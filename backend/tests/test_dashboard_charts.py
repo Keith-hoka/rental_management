@@ -26,7 +26,7 @@ def test_lease_covering_part_of_the_window_marks_only_those_months():
     prop = uuid.uuid4()
     leases = [FakeLease(prop, date(2026, 4, 10), date(2026, 5, 20))]
 
-    series = occupancy_series(leases, [date(2026, 1, 1)], MONTHS)
+    series = occupancy_series(leases, {prop: date(2026, 1, 1)}, MONTHS)
 
     assert [(p.month, p.occupied) for p in series] == [
         ("2026-02", 0),
@@ -44,7 +44,9 @@ def test_property_created_mid_window_is_not_in_earlier_denominators():
 
     Every other test still passes if this is got wrong, so it needs its own.
     """
-    series = occupancy_series([], [date(2026, 1, 1), date(2026, 6, 15)], MONTHS)
+    series = occupancy_series(
+        [], {uuid.uuid4(): date(2026, 1, 1), uuid.uuid4(): date(2026, 6, 15)}, MONTHS
+    )
 
     assert [(p.month, p.total) for p in series] == [
         ("2026-02", 1),
@@ -57,20 +59,38 @@ def test_property_created_mid_window_is_not_in_earlier_denominators():
 
 
 def test_zero_properties_gives_zero_rate_not_a_crash():
-    series = occupancy_series([], [], MONTHS)
+    series = occupancy_series([], {}, MONTHS)
 
     assert [p.rate for p in series] == [0.0] * 6
     assert [p.total for p in series] == [0] * 6
 
 
 def test_rate_is_rounded_to_one_decimal_place():
-    props = [date(2026, 1, 1)] * 7
-    occupied = [FakeLease(uuid.uuid4(), date(2026, 1, 1), date(2026, 12, 31)) for _ in range(3)]
+    ids = [uuid.uuid4() for _ in range(7)]
+    props = {pid: date(2026, 1, 1) for pid in ids}
+    occupied = [FakeLease(pid, date(2026, 1, 1), date(2026, 12, 31)) for pid in ids[:3]]
 
     series = occupancy_series(occupied, props, MONTHS)
 
     # 3/7 is 42.857142857142854 unrounded, which is what a tooltip would print.
     assert series[0].rate == 42.9
+
+
+def test_backdated_lease_counts_its_property_in_the_denominator():
+    """A property recorded today can carry a lease that started long before.
+
+    That is the normal onboarding path -- a landlord enters an existing tenancy
+    on their first day -- and counting it in the numerator while excluding it
+    from the denominator produced "1 of 0" and a flat 0% for every earlier month.
+    """
+    prop = uuid.uuid4()
+    leases = [FakeLease(prop, date(2026, 1, 1), date(2026, 12, 31))]
+
+    # The row was created in July; the tenancy has run since January.
+    series = occupancy_series(leases, {prop: date(2026, 7, 20)}, MONTHS)
+
+    assert [(p.occupied, p.total) for p in series] == [(1, 1)] * 6
+    assert all(p.rate == 100.0 for p in series)
 
 
 REQ = {"title": "Tap", "description": "Drips", "priority": "low"}

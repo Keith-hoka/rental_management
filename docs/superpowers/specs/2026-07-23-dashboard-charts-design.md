@@ -51,9 +51,15 @@ last six months, and the status breakdown of maintenance requests raised in the 
 - **Occupancy is a six-month trend**, matching the monthly income chart's window, not a snapshot.
   The dashboard already answers "how are we now" with a stat card; a chart earns its space only by
   answering "is it getting better or worse".
-- **The denominator is properties that existed in that month**, from `Property.created_at`, not
-  today's total. Buying three properties last month would otherwise make five months of history
-  look like a decline that never happened.
+- **The denominator is properties that existed in that month**, not today's total. Buying three
+  properties last month would otherwise make five months of history look like a decline that never
+  happened.
+- **A property counts from the earlier of its row's creation and its first lease's start.**
+  `Property.created_at` alone is wrong: a landlord joining today records tenancies that began long
+  before, so the lease put the property in the numerator while the creation date kept it out of
+  the denominator — producing `1 of 0` and a flat 0% for every month before they signed up. This
+  was found by driving the real UI after the first implementation passed all six unit tests, none
+  of which paired a backdated lease with a freshly created property.
 - **Zero properties gives `rate = 0`**, not a crash and not `NaN`.
 - **`rate` is rounded to one decimal place.** Three of seven properties is 42.857142857142854
   unrounded, and that is what a tooltip would print. Rounding belongs in the service, not in each

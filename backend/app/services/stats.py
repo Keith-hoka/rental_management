@@ -1,3 +1,4 @@
+import uuid
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
@@ -88,19 +89,34 @@ def _month_end(month_start: date) -> date:
 
 
 def occupancy_series(
-    leases, property_dates: list[date], months: list[date]
+    leases, property_created: dict[uuid.UUID, date], months: list[date]
 ) -> list[OccupancyPoint]:
     """Occupied share of the portfolio for each month.
 
     Numerator: distinct properties whose lease covers any part of the month, so a
-    tenancy ending on the 3rd still counts for that month. Denominator: properties
-    created on or before the month's end, not today's count -- buying property
-    later would otherwise turn earlier months into a decline that never happened.
+    tenancy ending on the 3rd still counts for that month.
+
+    Denominator: properties that existed that month, not today's count -- buying
+    property later would otherwise turn earlier months into a decline that never
+    happened. A property counts from the earlier of its row's creation and its
+    first lease's start: a landlord joining today records tenancies that began
+    long before, and counting those in the numerator while the row's creation
+    date kept them out of the denominator produced "1 of 0".
     """
+    earliest_lease: dict[uuid.UUID, date] = {}
+    for lease in leases:
+        known = earliest_lease.get(lease.property_id)
+        if known is None or lease.start_date < known:
+            earliest_lease[lease.property_id] = lease.start_date
+    existed_from = {
+        pid: min(created, earliest_lease.get(pid, created))
+        for pid, created in property_created.items()
+    }
+
     points = []
     for start in months:
         end = _month_end(start)
-        total = sum(1 for created in property_dates if created <= end)
+        total = sum(1 for since in existed_from.values() if since <= end)
         occupied = len(
             {
                 lease.property_id
@@ -143,15 +159,17 @@ async def dashboard_stats(session: AsyncSession, organization_id, today: date) -
     active = [lease for lease in leases if lease.start_date <= today <= lease.end_date]
     # created_at rather than a count(): the same rows give both the total and
     # each month's denominator, so the occupancy series costs no extra query.
-    property_dates = [
-        created.date()
-        for (created,) in (
+    property_created = {
+        pid: created.date()
+        for pid, created in (
             await session.execute(
-                select(Property.created_at).where(Property.organization_id == organization_id)
+                select(Property.id, Property.created_at).where(
+                    Property.organization_id == organization_id
+                )
             )
         ).all()
-    ]
-    properties_total = len(property_dates)
+    }
+    properties_total = len(property_created)
     months = _window_months(today)
     tenants = await _count(
         session,
@@ -178,6 +196,6 @@ async def dashboard_stats(session: AsyncSession, organization_id, today: date) -
         tenants=tenants,
         maintenance_open=maintenance_open,
         monthly_income=await _monthly_income(session, organization_id, today),
-        occupancy=occupancy_series(leases, property_dates, months),
+        occupancy=occupancy_series(leases, property_created, months),
         maintenance_by_status=await _maintenance_by_status(session, organization_id, months[0]),
     )
