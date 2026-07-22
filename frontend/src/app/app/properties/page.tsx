@@ -47,7 +47,7 @@ export default function PropertiesPage() {
       />
       <div className="mb-4 flex flex-wrap gap-2">
         <Input
-          placeholder="Search address"
+          placeholder="Search address, city, postcode"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs"

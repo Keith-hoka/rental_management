@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -81,7 +81,15 @@ async def list_properties(
     """List the caller org's properties, optionally searched and filtered."""
     query = select(Property).where(Property.organization_id == membership.organization_id)
     if search:
-        query = query.where(Property.address.ilike(f"%{search}%"))
+        term = f"%{search}%"
+        query = query.where(
+            or_(
+                Property.address.ilike(term),
+                Property.city.ilike(term),
+                Property.state.ilike(term),
+                Property.postcode.ilike(term),
+            )
+        )
     if type:
         query = query.where(Property.type == type)
     result = await session.execute(query.order_by(Property.created_at.desc()))

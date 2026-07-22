@@ -53,3 +53,28 @@ async def test_filter_by_status_and_type(client):
 
     condo = await client.get("/api/v1/properties?type=condo", headers=headers)
     assert [p["address"] for p in condo.json()] == ["B"]
+
+
+async def test_search_matches_city_state_and_postcode(client):
+    headers = await landlord_headers(client, "region-search@example.com")
+    await client.post(
+        "/api/v1/properties",
+        json={
+            "address": "12 Oak Avenue",
+            "city": "Sydney",
+            "state": "NSW",
+            "postcode": "2000",
+            "type": "house",
+            "image_urls": [],
+        },
+        headers=headers,
+    )
+    await make_property(client, headers, "99 Pine Street")
+
+    for term in ("sydney", "nsw", "2000"):
+        results = (await client.get(f"/api/v1/properties?search={term}", headers=headers)).json()
+        assert [p["address"] for p in results] == ["12 Oak Avenue"], term
+
+    # A property with no region set must not match a region term.
+    results = (await client.get("/api/v1/properties?search=pine", headers=headers)).json()
+    assert [p["address"] for p in results] == ["99 Pine Street"]

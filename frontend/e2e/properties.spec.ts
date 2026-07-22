@@ -17,7 +17,7 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/properties/);
   await page.getByRole("link", { name: "New property" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/new$/);
-  // Exact match: "Address" must not also match the list page's "Search address".
+  // Exact match: "Address" must not also match the list page's search placeholder.
   await page.getByPlaceholder("Address", { exact: true }).fill("42 Test Lane");
   await page.getByPlaceholder("City").fill("Sydney");
   await page.getByPlaceholder("State / province").fill("NSW");
@@ -27,6 +27,15 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   // Returns to the list, where the new property appears.
   await expect(page).toHaveURL(/\/app\/properties$/);
   await expect(page.getByText("42 Test Lane, Sydney NSW 2000")).toBeVisible();
+
+  // Search reaches the city as well as the address: "Sydney" is not in "42 Test
+  // Lane", so a hit can only have come from the city column.
+  const search = page.getByPlaceholder("Search address, city, postcode");
+  await search.fill("Sydney");
+  await expect(page.getByText("42 Test Lane, Sydney NSW 2000")).toBeVisible();
+  await search.fill("Melbourne");
+  await expect(page.getByText("42 Test Lane")).toHaveCount(0);
+  await search.fill("");
 
   // Open it, change the bedroom count, save — returns to the property with the update.
   await page.getByRole("link", { name: "42 Test Lane" }).click();
