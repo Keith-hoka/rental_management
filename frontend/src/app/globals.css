@@ -35,9 +35,12 @@
   --line: #262a36;
   --ink: #e8eaf0;
   --ink-muted: #9ba1b0;
-  --brand: #6366f1;
+  /* Same indigo as light: white on it is 6.29:1, where the lighter #6366f1
+     reached only 4.47:1 and missed AA. Hover darkens, as it does in light,
+     because a lighter hover drops white text to about 3:1. */
+  --brand: #4f46e5;
   --brand-fg: #a5b4fc;
-  --brand-hover: #818cf8;
+  --brand-hover: #4338ca;
   --brand-soft: #242943;
   --brand-on-soft: #c7d2fe;
   --success: #4ade80;
@@ -61,9 +64,9 @@
     --line: #262a36;
     --ink: #e8eaf0;
     --ink-muted: #9ba1b0;
-    --brand: #6366f1;
+    --brand: #4f46e5;
     --brand-fg: #a5b4fc;
-    --brand-hover: #818cf8;
+    --brand-hover: #4338ca;
     --brand-soft: #242943;
     --brand-on-soft: #c7d2fe;
     --success: #4ade80;
