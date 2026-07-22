@@ -112,7 +112,8 @@ test("leases are reachable from the dashboard and the properties list", async ({
   await expect(page.getByText("active")).toBeVisible();
 
   // The properties list offers a per-row shortcut to that property's leases.
+  // Scoped to main: the sidebar also has a "Leases" link on every page.
   await page.goto("/app/properties");
-  await page.getByRole("link", { name: "Leases" }).click();
+  await page.getByRole("main").getByRole("link", { name: "Leases" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
 });

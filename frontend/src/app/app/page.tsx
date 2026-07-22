@@ -18,20 +18,13 @@ import {
   type MaintenancePriority,
 } from "@/lib/maintenance";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AppShell } from "@/components/app-shell";
+import { Card, PageHeader, StatCard } from "@/components/ui";
 
 interface Me {
   email: string;
   name: string;
   role: string;
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border p-3">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-lg font-semibold text-gray-800">{value}</p>
-    </div>
-  );
 }
 
 export default function DashboardPage() {
@@ -282,16 +275,13 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <p data-testid="welcome" className="mt-2 text-gray-700">
-        Welcome, {me.name} ({me.role})
-      </p>
+    <AppShell me={me} unread={unread} onLogOut={logOut}>
+      <PageHeader title="Dashboard" />
       {stats && (
         <>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <StatCard label="Outstanding" value={`$${stats.outstanding}`} />
-            <StatCard label="Overdue" value={`$${stats.overdue}`} />
+            <StatCard label="Overdue" value={`$${stats.overdue}`} tone="danger" />
             <StatCard label="Collected this month" value={`$${stats.collected_this_month}`} />
             <StatCard
               label="Properties"
@@ -300,45 +290,25 @@ export default function DashboardPage() {
             <StatCard label="Active leases" value={String(stats.active_leases)} />
             <StatCard label="Tenants" value={String(stats.tenants)} />
           </div>
-          <h2 className="mb-2 mt-6 font-semibold">Monthly income</h2>
-          <div className="mb-2">
+          <Card title="Monthly income" className="mt-5">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={stats.monthly_income}>
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="amount" fill="#2563eb" />
+                <XAxis dataKey="month" stroke="var(--ink-muted)" fontSize={12} />
+                <YAxis stroke="var(--ink-muted)" fontSize={12} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
+                    borderRadius: 12,
+                    color: "var(--ink)",
+                  }}
+                />
+                <Bar dataKey="amount" fill="var(--brand)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
         </>
       )}
-      <div className="mt-4 flex gap-3">
-        <Link href="/app/properties" className="rounded border px-3 py-1 text-blue-600">
-          Properties
-        </Link>
-        <Link href="/app/leases" className="rounded border px-3 py-1 text-blue-600">
-          Leases
-        </Link>
-        <Link href="/app/maintenance" className="rounded border px-3 py-1 text-blue-600">
-          Maintenance
-        </Link>
-        <Link href="/app/team" className="rounded border px-3 py-1 text-blue-600">
-          Team
-        </Link>
-        <Link href="/app/messages" className="rounded border px-3 py-1 text-blue-600">
-          Messages{unread > 0 ? ` (${unread})` : ""}
-        </Link>
-        <Link href="/app/change-password" className="rounded border px-3 py-1 text-blue-600">
-          Change password
-        </Link>
-        <Link href="/app/profile" className="rounded border px-3 py-1 text-blue-600">
-          Contact info
-        </Link>
-        <button onClick={logOut} className="rounded border px-3 py-1">
-          Log out
-        </button>
-      </div>
-    </main>
+    </AppShell>
   );
 }
