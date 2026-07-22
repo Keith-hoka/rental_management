@@ -6,6 +6,7 @@ export {
   linkButtonSecondary,
 } from "./button";
 export { Card } from "./card";
+export { ConfirmDialog } from "./confirm-dialog";
 export { StatCard } from "./stat-card";
 export { Field } from "./field";
 export { Input, Select, Textarea } from "./input";

@@ -19,6 +19,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   Field,
   Input,
   PageHeader,
@@ -266,28 +267,16 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         </>
       )}
 
-      {confirming && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
-          {/* A real dialog: the form behind it also has a Cancel button, and the
-              role is what keeps the two distinguishable. */}
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Delete property"
-            className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg"
-          >
-            <p className="mb-4 text-text">Delete this property? This cannot be undone.</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
-                Cancel
-              </Button>
-              <Button variant="danger" size="sm" onClick={onDelete}>
-                Yes, delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* A real dialog: the form behind it also has a Cancel button, and the
+          role is what keeps the two distinguishable. */}
+      <ConfirmDialog
+        open={confirming}
+        label="Delete property"
+        message="Delete this property? This cannot be undone."
+        confirmLabel="Yes, delete"
+        onConfirm={onDelete}
+        onCancel={() => setConfirming(false)}
+      />
     </AppShell>
   );
 }

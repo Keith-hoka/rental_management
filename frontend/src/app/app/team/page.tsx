@@ -14,6 +14,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   DataList,
   DataRow,
   EmptyState,
@@ -26,6 +27,7 @@ export default function TeamPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   useEffect(() => {
     if (!me) return;
@@ -51,6 +53,7 @@ export default function TeamPage() {
   }
 
   async function onRevoke(id: string) {
+    setRevoking(null);
     await revokeInvitation(id);
     setInvitations(await listInvitations());
   }
@@ -90,7 +93,7 @@ export default function TeamPage() {
                   <span>
                     {inv.email} <Badge tone="neutral">{inv.role}</Badge>
                   </span>
-                  <Button variant="danger" size="sm" onClick={() => onRevoke(inv.id)}>
+                  <Button variant="danger" size="sm" onClick={() => setRevoking(inv.id)}>
                     Revoke
                   </Button>
                 </div>
@@ -104,6 +107,14 @@ export default function TeamPage() {
           </DataList>
         </Card>
       </div>
+      <ConfirmDialog
+        open={revoking !== null}
+        label="Revoke invitation"
+        message="Revoke this invitation? The emailed link stops working."
+        confirmLabel="Yes, revoke"
+        onConfirm={() => revoking && onRevoke(revoking)}
+        onCancel={() => setRevoking(null)}
+      />
     </AppShell>
   );
 }

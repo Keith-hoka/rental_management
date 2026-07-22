@@ -45,8 +45,10 @@ test("landlord invites a tenant from the lease detail", async ({ page }) => {
   // The invite is now pending — the button becomes Revoke.
   await expect(page.getByRole("button", { name: "Revoke" })).toBeVisible();
 
-  // Revoking brings the Invite button back.
+  // Revoking brings the Invite button back, via a confirmation.
   await page.getByRole("button", { name: "Revoke" }).click();
+  await expect(page.getByRole("dialog", { name: "Revoke invitation" })).toBeVisible();
+  await page.getByRole("button", { name: "Yes, revoke" }).click();
   await expect(page.getByRole("button", { name: "Invite" })).toBeVisible();
 
   // A fresh lease has no reminders yet — the read-only section shows its empty state.

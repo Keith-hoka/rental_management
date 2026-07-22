@@ -10,6 +10,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   Input,
   PageHeader,
   Select,
@@ -77,6 +78,9 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [form, setForm] = useState<LeaseInput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Ids rather than booleans: the dialog has to know which row it is acting on.
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [deletingPayment, setDeletingPayment] = useState<string | null>(null);
   const [joined, setJoined] = useState<LeaseTenantInfo[]>([]);
   const [pending, setPending] = useState<LeaseInvitationInfo[]>([]);
   const [reminders, setReminders] = useState<LeaseReminderInfo[]>([]);
@@ -224,6 +228,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   async function onRevoke(invitationId: string) {
     setInviteError(null);
     setInviteStatus(null);
+    setRevoking(null);
     try {
       await revokeLeaseInvitation(leaseId, invitationId);
       await refreshTenants();
@@ -258,6 +263,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   }
 
   async function onDeletePayment(paymentId: string) {
+    setDeletingPayment(null);
     await deleteLeasePayment(leaseId, paymentId);
     await refreshMoney();
   }
@@ -470,7 +476,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                     ) : invite ? (
                       <span className="flex items-center gap-2">
                         <span className="text-xs text-muted">Pending</span>
-                        <Button variant="danger" size="sm" onClick={() => onRevoke(invite.id)}>
+                        <Button variant="danger" size="sm" onClick={() => setRevoking(invite.id)}>
                           Revoke
                         </Button>
                       </span>
@@ -589,7 +595,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                       variant="danger"
                       size="sm"
                       aria-label={`Delete payment of $${p.amount} on ${p.paid_on}`}
-                      onClick={() => onDeletePayment(p.id)}
+                      onClick={() => setDeletingPayment(p.id)}
                     >
                       Delete
                     </Button>
@@ -621,26 +627,30 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
         )}
       </p>
 
-      {confirming && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Delete lease"
-            className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg"
-          >
-            <p className="mb-4 text-text">Delete this lease? This cannot be undone.</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
-                Cancel
-              </Button>
-              <Button variant="danger" size="sm" onClick={onDelete}>
-                Yes, delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirming}
+        label="Delete lease"
+        message="Delete this lease? This cannot be undone."
+        confirmLabel="Yes, delete"
+        onConfirm={onDelete}
+        onCancel={() => setConfirming(false)}
+      />
+      <ConfirmDialog
+        open={revoking !== null}
+        label="Revoke invitation"
+        message="Revoke this invitation? The emailed link stops working."
+        confirmLabel="Yes, revoke"
+        onConfirm={() => revoking && onRevoke(revoking)}
+        onCancel={() => setRevoking(null)}
+      />
+      <ConfirmDialog
+        open={deletingPayment !== null}
+        label="Delete payment"
+        message="Delete this payment? The lease balance is recalculated."
+        confirmLabel="Yes, delete"
+        onConfirm={() => deletingPayment && onDeletePayment(deletingPayment)}
+        onCancel={() => setDeletingPayment(null)}
+      />
       </div>
     </AppShell>
   );

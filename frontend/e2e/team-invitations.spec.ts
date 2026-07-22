@@ -19,8 +19,10 @@ test("landlord invites a team member, sees it pending, and revokes it", async ({
   await page.getByRole("button", { name: "Invite" }).click();
   await expect(page.getByText("pm@example.com")).toBeVisible();
 
-  // Revoke it.
+  // Revoke it. Revoking is destructive, so it goes through a confirmation.
   await page.getByRole("button", { name: "Revoke" }).click();
+  await expect(page.getByRole("dialog", { name: "Revoke invitation" })).toBeVisible();
+  await page.getByRole("button", { name: "Yes, revoke" }).click();
   await expect(page.getByText("pm@example.com")).toHaveCount(0);
 });
 

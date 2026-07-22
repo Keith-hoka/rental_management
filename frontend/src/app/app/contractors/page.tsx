@@ -13,6 +13,7 @@ import { useShell } from "@/components/use-shell";
 import {
   Button,
   Card,
+  ConfirmDialog,
   DataList,
   DataRow,
   EmptyState,
@@ -29,6 +30,7 @@ export default function ContractorsPage() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     if (!me) return;
@@ -63,6 +65,7 @@ export default function ContractorsPage() {
 
   async function onDelete(id: string) {
     setError(null);
+    setDeleting(null);
     try {
       await deleteContractor(id);
       setContractors(await listContractors());
@@ -118,7 +121,7 @@ export default function ContractorsPage() {
                   {c.phone ?? "no phone"} · {c.email ?? "no email - work orders cannot be sent"}
                 </span>
               </span>
-              <Button variant="danger" size="sm" onClick={() => onDelete(c.id)}>
+              <Button variant="danger" size="sm" onClick={() => setDeleting(c.id)}>
                 Delete
               </Button>
             </div>
@@ -130,6 +133,14 @@ export default function ContractorsPage() {
           </DataRow>
         )}
       </DataList>
+      <ConfirmDialog
+        open={deleting !== null}
+        label="Delete contractor"
+        message="Delete this contractor? This cannot be undone."
+        confirmLabel="Yes, delete"
+        onConfirm={() => deleting && onDelete(deleting)}
+        onCancel={() => setDeleting(null)}
+      />
     </AppShell>
   );
 }
