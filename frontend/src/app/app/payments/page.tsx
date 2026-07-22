@@ -60,7 +60,12 @@ export default function PaymentsPage() {
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
       <PageHeader title="Payments" />
-      <Card title="Payment history" actions={<span className="text-sm text-muted">${total}</span>}>
+      {/* toFixed: the API sends amounts as fixed-point strings, so a summed
+          total must be formatted back or it renders as $1800.5 beside $1800.50. */}
+      <Card
+        title="Payment history"
+        actions={<span className="text-sm text-muted">${total.toFixed(2)}</span>}
+      >
         <PaymentTable payments={payments} />
       </Card>
     </AppShell>

@@ -100,7 +100,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
             <Card title="Summary" className="mb-5">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <StatCard label="Rent collected" value={`$${collected}`} />
+                <StatCard label="Rent collected" value={`$${collected.toFixed(2)}`} />
                 <StatCard
                   label="Rent due"
                   value={`$${balance?.outstanding ?? 0}`}
