@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
@@ -15,7 +15,7 @@ from app.models import (
     Property,
     Role,
 )
-from app.schemas.stats import DashboardStats, MonthlyIncome
+from app.schemas.stats import DashboardStats, MonthlyIncome, OccupancyPoint
 from app.services.payments import org_charge_statuses, summarize
 
 
@@ -48,6 +48,43 @@ async def _monthly_income(
         MonthlyIncome(month=f"{d.year:04d}-{d.month:02d}", amount=buckets[(d.year, d.month)])
         for d in months
     ]
+
+
+def _month_end(month_start: date) -> date:
+    return month_start + relativedelta(months=1) - timedelta(days=1)
+
+
+def occupancy_series(
+    leases, property_dates: list[date], months: list[date]
+) -> list[OccupancyPoint]:
+    """Occupied share of the portfolio for each month.
+
+    Numerator: distinct properties whose lease covers any part of the month, so a
+    tenancy ending on the 3rd still counts for that month. Denominator: properties
+    created on or before the month's end, not today's count -- buying property
+    later would otherwise turn earlier months into a decline that never happened.
+    """
+    points = []
+    for start in months:
+        end = _month_end(start)
+        total = sum(1 for created in property_dates if created <= end)
+        occupied = len(
+            {
+                lease.property_id
+                for lease in leases
+                if lease.start_date <= end and start <= lease.end_date
+            }
+        )
+        rate = round(occupied * 100 / total, 1) if total else 0.0
+        points.append(
+            OccupancyPoint(
+                month=f"{start.year:04d}-{start.month:02d}",
+                occupied=occupied,
+                total=total,
+                rate=rate,
+            )
+        )
+    return points
 
 
 async def dashboard_stats(session: AsyncSession, organization_id, today: date) -> DashboardStats:

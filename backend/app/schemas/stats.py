@@ -11,6 +11,13 @@ class MonthlyIncome(BaseModel):
     amount: float
 
 
+class OccupancyPoint(BaseModel):
+    month: str
+    occupied: int
+    total: int
+    rate: float
+
+
 class DashboardStats(BaseModel):
     outstanding: Decimal
     overdue: Decimal
