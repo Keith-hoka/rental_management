@@ -1,22 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
+import { AppShell } from "@/components/app-shell";
+import { PortalShell } from "@/components/portal-shell";
+import { useShell } from "@/components/use-shell";
+import { Button, Card, Input, PageHeader } from "@/components/ui";
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
+  const { me, unread, logOut } = useShell();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (!getAccessToken()) router.replace("/login");
-  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,58 +33,56 @@ export default function ChangePasswordPage() {
     }
   }
 
+  if (!me) return null;
+
+  const Shell = me.role === "tenant" ? PortalShell : AppShell;
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm space-y-4 rounded-lg bg-white p-8 shadow">
-        <h1 className="text-2xl font-semibold">Change password</h1>
-        {done ? (
-          <p data-testid="change-success" className="text-sm text-green-700">
-            Your password has been changed.
-          </p>
-        ) : (
-          <form onSubmit={onSubmit} className="space-y-4">
-            {error && (
-              <p data-testid="change-error" className="text-sm text-red-600" role="alert">
-                {error}
-              </p>
-            )}
-            <input
-              type="password"
-              required
-              placeholder="Current password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded border px-3 py-2"
-            />
-            <input
-              type="password"
-              required
-              minLength={8}
-              placeholder="New password (min 8 chars)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded border px-3 py-2"
-            />
-            <input
-              type="password"
-              required
-              minLength={8}
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded border px-3 py-2"
-            />
-            <button type="submit" className="w-full rounded bg-blue-600 py-2 text-white">
-              Update password
-            </button>
-          </form>
-        )}
-        <p className="text-sm text-gray-600">
-          <Link href="/app" className="text-blue-600">
-            Back to dashboard
-          </Link>
-        </p>
+    <Shell me={me} unread={unread} onLogOut={logOut}>
+      <div className="mx-auto max-w-lg">
+        <PageHeader title="Change password" />
+        <Card>
+          {done ? (
+            <p data-testid="change-success" className="text-sm text-success">
+              Your password has been changed.
+            </p>
+          ) : (
+            <form onSubmit={onSubmit} className="space-y-3">
+              {error && (
+                <p data-testid="change-error" className="text-sm text-danger" role="alert">
+                  {error}
+                </p>
+              )}
+              <Input
+                type="password"
+                required
+                placeholder="Current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+              <Input
+                type="password"
+                required
+                minLength={8}
+                placeholder="New password (min 8 chars)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <Input
+                type="password"
+                required
+                minLength={8}
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+              <Button type="submit" className="w-full">
+                Update password
+              </Button>
+            </form>
+          )}
+        </Card>
       </div>
-    </main>
+    </Shell>
   );
 }

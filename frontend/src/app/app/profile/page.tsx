@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ApiError } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
 import { getMe, updateProfile, type Me } from "@/lib/profile";
+import { AppShell } from "@/components/app-shell";
+import { PortalShell } from "@/components/portal-shell";
+import { useShell } from "@/components/use-shell";
+import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const [me, setMe] = useState<Me | null>(null);
+  const { me: user, unread, logOut } = useShell();
+  // Its own fetch: useShell only carries the name and role the chrome needs,
+  // while this page owns the editable record, phone included.
+  const [profile, setProfile] = useState<Me | null>(null);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -17,30 +20,24 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.replace("/login");
-      return;
-    }
+    if (!user) return;
     let active = true;
     getMe()
-      .then((m) => {
-        if (active) setMe(m);
-      })
-      .catch(() => {
-        if (active) setError("Could not load profile");
-      });
+      .then((m) => active && setProfile(m))
+      .catch(() => active && setError("Could not load profile"));
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [user]);
 
-  if (error && !me) return <main className="p-8 text-red-600">{error}</main>;
-  if (!me) return null;
+  if (!user) return null;
+
+  const Shell = user.role === "tenant" ? PortalShell : AppShell;
 
   function startEdit() {
-    if (!me) return;
-    setName(me.name);
-    setPhone(me.phone ?? "");
+    if (!profile) return;
+    setName(profile.name);
+    setPhone(profile.phone ?? "");
     setStatus(null);
     setError(null);
     setEditing(true);
@@ -50,8 +47,7 @@ export default function ProfilePage() {
     e.preventDefault();
     setError(null);
     try {
-      const updated = await updateProfile({ name, phone });
-      setMe(updated);
+      setProfile(await updateProfile({ name, phone }));
       setEditing(false);
       setStatus("Saved");
     } catch (err) {
@@ -60,73 +56,69 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg p-8">
-      <h1 className="mb-4 text-2xl font-semibold">Contact info</h1>
-      {error && (
-        <p className="mb-2 text-sm text-red-600" role="alert">
-          {error}
-        </p>
-      )}
-      {status && <p className="mb-2 text-sm text-green-700">{status}</p>}
+    <Shell me={user} unread={unread} onLogOut={logOut}>
+      <div className="mx-auto max-w-lg">
+        <PageHeader title="Contact info" />
+        {error && (
+          <p className="mb-3 text-sm text-danger" role="alert">
+            {error}
+          </p>
+        )}
+        {status && <p className="mb-3 text-sm text-success">{status}</p>}
 
-      {editing ? (
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input
-            required
-            placeholder="Your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded border px-3 py-2"
-          />
-          <input
-            placeholder="Phone (optional)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded border px-3 py-2"
-          />
-          <div className="flex gap-2">
-            <button type="submit" className="flex-1 rounded bg-blue-600 py-2 text-white">
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="flex-1 rounded border py-2 transition hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <>
-          <dl className="mb-6 text-sm">
-            <div className="flex justify-between border-b py-2">
-              <dt className="text-gray-500">Name</dt>
-              <dd className="font-medium text-gray-800">{me.name}</dd>
-            </div>
-            <div className="flex justify-between border-b py-2">
-              <dt className="text-gray-500">Email</dt>
-              <dd className="font-medium text-gray-800">{me.email}</dd>
-            </div>
-            <div className="flex justify-between border-b py-2">
-              <dt className="text-gray-500">Phone</dt>
-              <dd className="font-medium text-gray-800">{me.phone || "—"}</dd>
-            </div>
-          </dl>
-          <button
-            onClick={startEdit}
-            className="rounded border px-3 py-2 text-blue-600 transition hover:bg-blue-50"
-          >
-            Edit
-          </button>
-        </>
-      )}
-
-      <p className="mt-6">
-        <Link href="/app" className="text-blue-600">
-          Back to dashboard
-        </Link>
-      </p>
-    </main>
+        {profile && (
+          <Card>
+            {editing ? (
+              <form onSubmit={onSubmit} className="space-y-3">
+                <Field label="Name">
+                  <Input
+                    required
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </Field>
+                <Field label="Phone">
+                  <Input
+                    placeholder="Phone (optional)"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </Field>
+                <Button type="submit" className="w-full">
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => setEditing(false)}
+                >
+                  Cancel
+                </Button>
+              </form>
+            ) : (
+              <>
+                <dl className="text-sm">
+                  {[
+                    ["Name", profile.name],
+                    ["Email", profile.email],
+                    ["Phone", profile.phone || "—"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between border-b border-border py-2">
+                      <dt className="text-muted">{label}</dt>
+                      <dd className="font-medium text-text">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <Button variant="secondary" className="mt-4 w-full" onClick={startEdit}>
+                  Edit
+                </Button>
+              </>
+            )}
+          </Card>
+        )}
+      </div>
+    </Shell>
   );
 }

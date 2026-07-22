@@ -19,8 +19,22 @@ import {
 } from "@/lib/maintenance";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppShell } from "@/components/app-shell";
+import { PortalShell } from "@/components/portal-shell";
 import { PaymentTable } from "@/components/payment-table";
-import { Badge, Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  DataList,
+  DataRow,
+  EmptyState,
+  Input,
+  PageHeader,
+  Select,
+  StatCard,
+  Textarea,
+  linkButtonOutline,
+} from "@/components/ui";
 import { listProperties, type Property } from "@/lib/properties";
 import { listRecentPayments, type RecentPayment } from "@/lib/payments";
 
@@ -136,104 +150,120 @@ export default function DashboardPage() {
 
   if (me.role === "tenant") {
     return (
-      <main className="mx-auto max-w-lg p-8">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p data-testid="welcome" className="mt-2 text-gray-700">
-          Welcome, {me.name} ({me.role})
-        </p>
-        <h2 className="mb-2 mt-6 font-semibold">Your lease</h2>
-        <ul className="space-y-3">
-          {myLeases.map((l) => (
-            <li key={l.id} className="rounded border p-3 text-sm">
-              <p className="font-medium text-gray-800">{l.property_address}</p>
-              <p className="text-gray-700">
-                ${l.rent_amount} / {l.rent_frequency} · {l.start_date} to {l.end_date} · {l.state}
+      <PortalShell me={me} unread={unread} onLogOut={logOut}>
+        <PageHeader title={`Welcome, ${me.name}`} />
+        {myLeases.length === 0 && <EmptyState>No lease yet.</EmptyState>}
+        {myLeases.map((l) => (
+          <div key={l.id} className="mb-5 space-y-5">
+            <Card title={l.property_address}>
+              <p className="mb-2">
+                <Badge tone={l.state === "active" ? "success" : "brand"}>{l.state}</Badge>
               </p>
-              {l.bond_amount != null && <p className="text-gray-600">Bond: ${l.bond_amount}</p>}
-              {l.notice_period_days != null && (
-                <p className="text-gray-600">Notice period: {l.notice_period_days} days</p>
-              )}
-              <p className="mt-1 text-gray-700">
+              <p className="text-sm text-text">
+                ${l.rent_amount} / {l.rent_frequency}
+              </p>
+              <p className="text-sm text-muted">
+                {l.start_date} to {l.end_date}
+                {l.bond_amount != null && ` · Bond $${l.bond_amount}`}
+                {l.notice_period_days != null && ` · Notice ${l.notice_period_days} days`}
+              </p>
+              <p className="mt-1 text-sm text-muted">
                 Landlord contact: {l.landlord_name} — {l.landlord_email}
                 {l.landlord_phone ? ` — ${l.landlord_phone}` : ""}
               </p>
-              <p className="mt-1 text-gray-700">
-                Outstanding <span className="font-medium text-gray-800">${l.outstanding}</span>
-                {" · "}Overdue{" "}
-                <span className="font-medium text-red-600">${l.overdue_amount}</span>
-              </p>
-              {(chargesByLease[l.id]?.length ?? 0) > 0 && (
-                <ul className="mt-2 space-y-1 text-gray-700">
-                  {chargesByLease[l.id].map((c) => (
-                    <li key={c.id} className="flex justify-between">
-                      <span>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <StatCard label="Outstanding" value={`$${l.outstanding}`} />
+                <StatCard label="Overdue" value={`$${l.overdue_amount}`} tone="danger" />
+              </div>
+            </Card>
+
+            <Card title="Rent charges">
+              <DataList>
+                {(chargesByLease[l.id] ?? []).map((c) => (
+                  <DataRow key={c.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-muted">
                         {c.period_start} – {c.period_end} · due {c.due_date}
                       </span>
-                      <span>
-                        ${c.amount_paid} / ${c.amount_due} · {c.overdue ? "Overdue" : c.status}
+                      <span className="flex items-center gap-2">
+                        <span className="text-text">
+                          ${c.amount_paid} / ${c.amount_due}
+                        </span>
+                        <Badge tone={c.overdue ? "danger" : c.status === "paid" ? "success" : "neutral"}>
+                          {c.overdue ? "Overdue" : c.status}
+                        </Badge>
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-3">
-                <p className="font-medium text-gray-800">Maintenance</p>
-                <form onSubmit={(e) => reportIssue(l.id, e)} className="mt-1 flex flex-wrap gap-2">
-                  <input
-                    required
-                    placeholder="Issue title"
-                    value={issueTitle}
-                    onChange={(e) => setIssueTitle(e.target.value)}
-                    className="w-40 rounded border px-2 py-1 text-sm"
-                  />
-                  <input
-                    required
-                    placeholder="Description"
-                    value={issueDesc}
-                    onChange={(e) => setIssueDesc(e.target.value)}
-                    className="flex-1 rounded border px-2 py-1 text-sm"
-                  />
-                  <select
-                    aria-label="Priority"
-                    value={issuePriority}
-                    onChange={(e) => setIssuePriority(e.target.value as MaintenancePriority)}
-                    className="rounded border px-2 py-1 text-sm"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                  <button
-                    type="submit"
-                    className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
-                  >
-                    Report
-                  </button>
-                </form>
-                <ul className="mt-2 space-y-1">
+                    </div>
+                  </DataRow>
+                ))}
+                {(chargesByLease[l.id]?.length ?? 0) === 0 && (
+                  <DataRow>
+                    <EmptyState>No rent charges yet.</EmptyState>
+                  </DataRow>
+                )}
+              </DataList>
+            </Card>
+
+            <Card title="Maintenance">
+              <form onSubmit={(e) => reportIssue(l.id, e)} className="space-y-3">
+                <Input
+                  required
+                  placeholder="Issue title"
+                  value={issueTitle}
+                  onChange={(e) => setIssueTitle(e.target.value)}
+                />
+                <Textarea
+                  required
+                  placeholder="Description"
+                  value={issueDesc}
+                  onChange={(e) => setIssueDesc(e.target.value)}
+                />
+                <Select
+                  aria-label="Priority"
+                  value={issuePriority}
+                  onChange={(e) => setIssuePriority(e.target.value as MaintenancePriority)}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </Select>
+                <Button type="submit" className="w-full">
+                  Report
+                </Button>
+              </form>
+
+              <div className="mt-4">
+                <DataList>
                   {(maintByLease[l.id] ?? []).map((m) => (
-                    <li key={m.id} className="rounded border p-2">
-                      <span className="font-medium text-gray-800">{m.title}</span>{" "}
-                      <span className="text-xs text-gray-500">
-                        {m.priority} · {m.status}
-                      </span>
-                      <p className="text-gray-600">{m.description}</p>
+                    <DataRow key={m.id}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-text">{m.title}</span>
+                        <span className="flex items-center gap-2">
+                          <Badge tone={m.priority === "low" ? "neutral" : "warning"}>
+                            {m.priority}
+                          </Badge>
+                          <Badge tone={m.status === "resolved" ? "success" : "brand"}>
+                            {m.status}
+                          </Badge>
+                        </span>
+                      </div>
+                      <p className="mt-1 text-muted">{m.description}</p>
                       {m.image_urls.length > 0 && (
-                        <div className="mt-1 flex gap-1">
+                        <div className="mt-2 flex flex-wrap gap-2">
                           {m.image_urls.map((u) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               key={u}
                               src={`${API_BASE_URL}${u}`}
                               alt=""
-                              className="h-12 w-12 rounded object-cover"
+                              className="h-16 w-16 rounded-lg object-cover"
                             />
                           ))}
                         </div>
                       )}
-                      <div className="mt-1 flex items-center gap-3">
-                        <label className="cursor-pointer text-xs text-blue-600">
+                      <div className="mt-2 flex items-center gap-2">
+                        <label className={`${linkButtonOutline} cursor-pointer`}>
                           Add image
                           <input
                             type="file"
@@ -250,40 +280,30 @@ export default function DashboardPage() {
                           />
                         </label>
                         {(m.status === "open" || m.status === "in_progress") && (
-                          <button
+                          <Button
+                            variant="danger"
                             onClick={async () => {
                               await cancelMaintenance(m.id);
                               await refreshMaint(l.id);
                             }}
-                            className="text-xs text-red-600"
                           >
                             Cancel
-                          </button>
+                          </Button>
                         )}
                       </div>
-                    </li>
+                    </DataRow>
                   ))}
-                </ul>
+                  {(maintByLease[l.id] ?? []).length === 0 && (
+                    <DataRow>
+                      <EmptyState>No maintenance requests yet.</EmptyState>
+                    </DataRow>
+                  )}
+                </DataList>
               </div>
-            </li>
-          ))}
-          {myLeases.length === 0 && <li className="text-gray-500">No lease yet.</li>}
-        </ul>
-        <div className="mt-6 flex gap-3">
-          <Link href="/app/messages" className="rounded border px-3 py-1 text-blue-600">
-            Messages{unread > 0 ? ` (${unread})` : ""}
-          </Link>
-          <Link href="/app/profile" className="rounded border px-3 py-1 text-blue-600">
-            Contact info
-          </Link>
-          <Link href="/app/change-password" className="rounded border px-3 py-1 text-blue-600">
-            Change password
-          </Link>
-          <button onClick={logOut} className="rounded border px-3 py-1">
-            Log out
-          </button>
-        </div>
-      </main>
+            </Card>
+          </div>
+        ))}
+      </PortalShell>
     );
   }
 
