@@ -54,7 +54,7 @@ export default function PropertyLeasesPage({ params }: { params: Promise<{ id: s
       </DataList>
       <p className="mt-6">
         <Link href="/app/properties" className="text-brand">
-          Back to properties
+          Back
         </Link>
       </p>
     </AppShell>
