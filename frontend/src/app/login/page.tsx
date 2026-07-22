@@ -52,10 +52,12 @@ function LoginForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <p className="mb-2 text-sm text-muted">Select who you are and get started</p>
+        {/* inline-flex with content-sized segments: equal thirds are too narrow
+            for "Property manager", which then wraps onto two lines. */}
         <div
           role="radiogroup"
           aria-label="Role"
-          className="flex gap-1 rounded-lg border border-border bg-surface-2 p-1"
+          className="inline-flex gap-1 rounded-lg border border-border bg-surface-2 p-1"
         >
           {ROLES.map((option) => (
             <button
@@ -64,7 +66,7 @@ function LoginForm() {
               role="radio"
               aria-checked={role === option.value}
               onClick={() => setRole(option.value)}
-              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
                 role === option.value
                   ? "bg-brand text-white"
                   : "text-muted hover:bg-surface hover:text-text"
