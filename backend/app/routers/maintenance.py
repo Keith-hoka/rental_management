@@ -8,6 +8,7 @@ from app.core.db import get_session
 from app.core.deps import get_current_user
 from app.core.uploads import save_image
 from app.models import (
+    Contractor,
     Lease,
     LeaseTenant,
     MaintenanceRequest,
@@ -16,7 +17,9 @@ from app.models import (
     Property,
     User,
 )
+from app.routers.contractors import get_owned_contractor
 from app.routers.leases import manager
+from app.schemas.contractor import AssignContractor
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceInfo, MaintenanceUpdate
 from app.services.maintenance_notify import (
     notify_cancelled,
@@ -28,13 +31,20 @@ router = APIRouter(prefix="/api/v1", tags=["maintenance"])
 
 
 async def _to_info(session: AsyncSession, request: MaintenanceRequest) -> MaintenanceInfo:
-    """Build the response for a request, resolving the property address and reporter."""
+    """Build the response, resolving the property address, reporter and contractor."""
     address = (
         await session.execute(select(Property.address).where(Property.id == request.property_id))
     ).scalar_one()
     reporter = (
         await session.execute(select(User.name).where(User.id == request.created_by))
     ).scalar_one_or_none()
+    contractor = (
+        (
+            await session.execute(select(Contractor).where(Contractor.id == request.contractor_id))
+        ).scalar_one_or_none()
+        if request.contractor_id
+        else None
+    )
     return MaintenanceInfo(
         id=request.id,
         property_address=address,
@@ -45,6 +55,9 @@ async def _to_info(session: AsyncSession, request: MaintenanceRequest) -> Mainte
         image_urls=request.image_urls,
         reported_by=reporter or "",
         created_at=request.created_at,
+        contractor_id=request.contractor_id,
+        contractor_name=contractor.name if contractor else None,
+        contractor_phone=contractor.phone if contractor else None,
     )
 
 
@@ -207,4 +220,34 @@ async def update_request(
     await session.refresh(request)
     if request.status != previous_status:
         await notify_status_change(session, request)
+    return await _to_info(session, request)
+
+
+@router.post("/maintenance/{request_id}/assign", response_model=MaintenanceInfo)
+async def assign_contractor(
+    request_id: uuid.UUID,
+    body: AssignContractor,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> MaintenanceInfo:
+    """Assign a contractor to a request. Does not change the request's status."""
+    request = await get_owned_request(request_id, membership, session)
+    contractor = await get_owned_contractor(body.contractor_id, membership, session)
+    request.contractor_id = contractor.id
+    await session.commit()
+    await session.refresh(request)
+    return await _to_info(session, request)
+
+
+@router.delete("/maintenance/{request_id}/assign", response_model=MaintenanceInfo)
+async def unassign_contractor(
+    request_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> MaintenanceInfo:
+    """Clear a request's contractor. Sends nothing."""
+    request = await get_owned_request(request_id, membership, session)
+    request.contractor_id = None
+    await session.commit()
+    await session.refresh(request)
     return await _to_info(session, request)

@@ -27,3 +27,8 @@ class MaintenanceInfo(BaseModel):
     image_urls: list[str]
     reported_by: str
     created_at: datetime
+    # One schema serves both roles: name and phone are exactly what a tenant
+    # may see, so the tenant endpoints need no separate response model.
+    contractor_id: uuid.UUID | None = None
+    contractor_name: str | None = None
+    contractor_phone: str | None = None

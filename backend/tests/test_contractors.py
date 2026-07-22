@@ -106,3 +106,69 @@ async def test_other_orgs_contractor_is_404(client):
     # no isolation at all. The detail proves get_owned_contractor refused it.
     assert patched.json()["detail"] == "Contractor not found"
     assert (await client.delete(f"/api/v1/contractors/{cid}", headers=stranger)).status_code == 404
+
+
+async def _seed_request(client, db_session, prefix):
+    """A landlord, an onboarded tenant, and one open request. Returns (headers, request id)."""
+    headers = await landlord_headers(client, f"{prefix}@example.com")
+    lease_id = await make_lease(client, headers, f"{prefix} Street")
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, f"{prefix}-t@example.com")
+    rid = (
+        await client.post(f"/api/v1/me/leases/{lease_id}/maintenance", json=REQ, headers=tenant)
+    ).json()["id"]
+    return headers, rid
+
+
+async def test_assign_sets_the_contractor(client, db_session):
+    headers, rid = await _seed_request(client, db_session, "asg")
+    cid = (await client.post("/api/v1/contractors", json=CONTRACTOR, headers=headers)).json()["id"]
+
+    response = await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["contractor_id"] == cid
+    assert body["contractor_name"] == "Bob's Plumbing"
+    assert body["contractor_phone"] == "0400 123 456"
+    # Assignment records who does the work; it must not touch the status.
+    assert body["status"] == "open"
+
+
+async def test_unassign_clears_the_contractor(client, db_session):
+    headers, rid = await _seed_request(client, db_session, "unasg")
+    cid = (await client.post("/api/v1/contractors", json=CONTRACTOR, headers=headers)).json()["id"]
+    await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+
+    response = await client.delete(f"/api/v1/maintenance/{rid}/assign", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["contractor_id"] is None
+    assert response.json()["contractor_name"] is None
+
+
+async def test_assigning_another_orgs_contractor_is_404(client, db_session):
+    headers, rid = await _seed_request(client, db_session, "xorg")
+    stranger = await landlord_headers(client, "xorg-other@example.com")
+    foreign = (await client.post("/api/v1/contractors", json=CONTRACTOR, headers=stranger)).json()[
+        "id"
+    ]
+
+    response = await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": foreign}, headers=headers
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Contractor not found"
+
+
+async def test_delete_assigned_contractor_is_refused(client, db_session):
+    headers, rid = await _seed_request(client, db_session, "delasg")
+    cid = (await client.post("/api/v1/contractors", json=CONTRACTOR, headers=headers)).json()["id"]
+    await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+
+    response = await client.delete(f"/api/v1/contractors/{cid}", headers=headers)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Contractor is assigned to 1 maintenance requests"
