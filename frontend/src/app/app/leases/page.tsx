@@ -43,15 +43,12 @@ export default function AllLeasesPage() {
       <DataList>
         {leases.map((lease) => (
           <DataRow key={lease.id}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                <Link href={`/app/leases/${lease.id}`} className="font-medium text-text">
-                  {lease.property_address}
-                </Link>
-                <span className="text-muted">
-                  {" "}
-                  · {lease.tenant_name} · {lease.start_date} to {lease.end_date}
-                </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={`/app/leases/${lease.id}`} className="font-medium text-text">
+                {lease.property_address}
+              </Link>
+              <span className="text-muted">
+                {lease.tenant_name} · {lease.start_date} to {lease.end_date}
               </span>
               <Badge tone={STATE_TONES[lease.state]}>{lease.state}</Badge>
             </div>
