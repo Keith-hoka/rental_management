@@ -15,7 +15,12 @@ from app.models import (
     Property,
     Role,
 )
-from app.schemas.stats import DashboardStats, MonthlyIncome, OccupancyPoint
+from app.schemas.stats import (
+    DashboardStats,
+    MaintenanceStatusCount,
+    MonthlyIncome,
+    OccupancyPoint,
+)
 from app.services.payments import org_charge_statuses, summarize
 
 
@@ -32,10 +37,38 @@ async def _collected_since(session: AsyncSession, organization_id, since: date) 
     return Decimal(result.scalar_one())
 
 
+def _window_months(today: date) -> list[date]:
+    """The first of each of the last six months, oldest first."""
+    return [today.replace(day=1) - relativedelta(months=i) for i in range(5, -1, -1)]
+
+
+async def _maintenance_by_status(
+    session: AsyncSession, organization_id, since: date
+) -> list[MaintenanceStatusCount]:
+    """Requests raised since the given date, counted per status.
+
+    Statuses with no requests are reported as zero so the chart legend does not
+    appear and disappear between loads.
+    """
+    result = await session.execute(
+        select(MaintenanceRequest.status, func.count())
+        .where(
+            MaintenanceRequest.organization_id == organization_id,
+            MaintenanceRequest.created_at >= since,
+        )
+        .group_by(MaintenanceRequest.status)
+    )
+    counts = dict(result.all())
+    return [
+        MaintenanceStatusCount(status=status.value, count=counts.get(status, 0))
+        for status in MaintenanceStatus
+    ]
+
+
 async def _monthly_income(
     session: AsyncSession, organization_id, today: date
 ) -> list[MonthlyIncome]:
-    months = [today.replace(day=1) - relativedelta(months=i) for i in range(5, -1, -1)]
+    months = _window_months(today)
     result = await session.execute(
         select(Payment.paid_on, Payment.amount).where(
             Payment.organization_id == organization_id, Payment.paid_on >= months[0]
@@ -108,12 +141,18 @@ async def dashboard_stats(session: AsyncSession, organization_id, today: date) -
         overdue += balance.overdue_amount
 
     active = [lease for lease in leases if lease.start_date <= today <= lease.end_date]
-    properties_total = await _count(
-        session,
-        select(func.count())
-        .select_from(Property)
-        .where(Property.organization_id == organization_id),
-    )
+    # created_at rather than a count(): the same rows give both the total and
+    # each month's denominator, so the occupancy series costs no extra query.
+    property_dates = [
+        created.date()
+        for (created,) in (
+            await session.execute(
+                select(Property.created_at).where(Property.organization_id == organization_id)
+            )
+        ).all()
+    ]
+    properties_total = len(property_dates)
+    months = _window_months(today)
     tenants = await _count(
         session,
         select(func.count())
@@ -139,4 +178,6 @@ async def dashboard_stats(session: AsyncSession, organization_id, today: date) -
         tenants=tenants,
         maintenance_open=maintenance_open,
         monthly_income=await _monthly_income(session, organization_id, today),
+        occupancy=occupancy_series(leases, property_dates, months),
+        maintenance_by_status=await _maintenance_by_status(session, organization_id, months[0]),
     )

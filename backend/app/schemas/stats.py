@@ -18,6 +18,11 @@ class OccupancyPoint(BaseModel):
     rate: float
 
 
+class MaintenanceStatusCount(BaseModel):
+    status: str
+    count: int
+
+
 class DashboardStats(BaseModel):
     outstanding: Decimal
     overdue: Decimal
@@ -28,3 +33,5 @@ class DashboardStats(BaseModel):
     tenants: int
     maintenance_open: int
     monthly_income: list[MonthlyIncome]
+    occupancy: list[OccupancyPoint]
+    maintenance_by_status: list[MaintenanceStatusCount]

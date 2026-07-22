@@ -2,7 +2,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import date
 
-from app.services.stats import occupancy_series
+from dateutil.relativedelta import relativedelta
+
+from app.services.stats import dashboard_stats, occupancy_series
+from tests.test_portal import make_lease, onboard_tenant
+from tests.test_properties_crud import landlord_headers
+from tests.test_stats import _org_id
 
 
 @dataclass
@@ -66,3 +71,49 @@ def test_rate_is_rounded_to_one_decimal_place():
 
     # 3/7 is 42.857142857142854 unrounded, which is what a tooltip would print.
     assert series[0].rate == 42.9
+
+
+REQ = {"title": "Tap", "description": "Drips", "priority": "low"}
+
+
+async def _report(client, tenant_headers, lease_id):
+    return (
+        await client.post(
+            f"/api/v1/me/leases/{lease_id}/maintenance", json=REQ, headers=tenant_headers
+        )
+    ).json()["id"]
+
+
+async def test_counts_every_status_including_the_empty_ones(client, db_session):
+    email = "mstat@example.com"
+    headers = await landlord_headers(client, email)
+    org_id = await _org_id(db_session, email)
+    lease_id = await make_lease(client, headers, "1 Status St")
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, "mstat-t@example.com")
+    first = await _report(client, tenant, lease_id)
+    await _report(client, tenant, lease_id)
+    await client.patch(f"/api/v1/maintenance/{first}", json={"status": "resolved"}, headers=headers)
+
+    stats = await dashboard_stats(db_session, org_id, date.today())
+    counts = {c.status: c.count for c in stats.maintenance_by_status}
+
+    assert counts["open"] == 1
+    assert counts["resolved"] == 1
+    # Absent statuses report zero rather than vanishing, so the legend is stable.
+    assert counts["in_progress"] == 0
+    assert counts["cancelled"] == 0
+
+
+async def test_requests_older_than_the_window_are_excluded(client, db_session):
+    email = "mold@example.com"
+    headers = await landlord_headers(client, email)
+    org_id = await _org_id(db_session, email)
+    lease_id = await make_lease(client, headers, "1 Old St")
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, "mold-t@example.com")
+    await _report(client, tenant, lease_id)
+
+    # Seven months on, the same request has fallen out of the six-month window.
+    future = date.today() + relativedelta(months=7)
+    stats = await dashboard_stats(db_session, org_id, future)
+
+    assert sum(c.count for c in stats.maintenance_by_status) == 0

@@ -43,3 +43,19 @@ async def test_stats_forbidden_for_tenant(client, db_session):
     tenant = await onboard_tenant(client, db_session, headers, lease_id, "statst@example.com")
     response = await client.get("/api/v1/stats", headers=tenant)
     assert response.status_code == 403
+
+
+async def test_stats_payload_carries_both_chart_series(client):
+    headers = await landlord_headers(client, "statscharts@example.com")
+
+    body = (await client.get("/api/v1/stats", headers=headers)).json()
+
+    assert len(body["occupancy"]) == 6
+    assert {c["status"] for c in body["maintenance_by_status"]} == {
+        "open",
+        "in_progress",
+        "resolved",
+        "cancelled",
+    }
+    # Recharts cannot plot strings; the rate must arrive as a JSON number.
+    assert isinstance(body["occupancy"][0]["rate"], (int, float))
