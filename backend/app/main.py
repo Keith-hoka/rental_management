@@ -17,6 +17,7 @@ from app.routers.notifications import router as notifications_router
 from app.routers.payments import router as payments_router
 from app.routers.portal import router as portal_router
 from app.routers.properties import router as properties_router
+from app.routers.rent import router as rent_router
 from app.routers.stats import router as stats_router
 
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +43,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(contractors_router)
 app.include_router(properties_router)
+app.include_router(rent_router)
 app.include_router(invitations_router)
 app.include_router(leases_router)
 app.include_router(maintenance_router)
