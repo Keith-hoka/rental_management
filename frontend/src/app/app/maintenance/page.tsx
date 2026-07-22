@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { API_BASE_URL } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
 import {
   listMaintenance,
   updateMaintenance,
@@ -12,32 +9,42 @@ import {
   type MaintenancePriority,
   type MaintenanceStatus,
 } from "@/lib/maintenance";
+import { AppShell } from "@/components/app-shell";
+import { useShell } from "@/components/use-shell";
+import { Badge, DataList, DataRow, EmptyState, PageHeader, Select } from "@/components/ui";
 
 const STATUSES: MaintenanceStatus[] = ["open", "in_progress", "resolved", "cancelled"];
 const PRIORITIES: MaintenancePriority[] = ["low", "medium", "high", "urgent"];
 
+const STATUS_TONES: Record<MaintenanceStatus, "brand" | "warning" | "success" | "neutral"> = {
+  open: "brand",
+  in_progress: "warning",
+  resolved: "success",
+  cancelled: "neutral",
+};
+
+const PRIORITY_TONES: Record<MaintenancePriority, "danger" | "warning" | "neutral"> = {
+  urgent: "danger",
+  high: "danger",
+  medium: "warning",
+  low: "neutral",
+};
+
 export default function MaintenancePage() {
-  const router = useRouter();
+  const { me, unread, logOut } = useShell();
   const [requests, setRequests] = useState<MaintenanceInfo[]>([]);
   const [filter, setFilter] = useState<MaintenanceStatus | "">("");
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.replace("/login");
-      return;
-    }
+    if (!me) return;
     let active = true;
     listMaintenance(filter || undefined)
-      .then((r) => {
-        if (active) setRequests(r);
-      })
-      .catch(() => {
-        if (active) setRequests([]);
-      });
+      .then((r) => active && setRequests(r))
+      .catch(() => active && setRequests([]));
     return () => {
       active = false;
     };
-  }, [router, filter]);
+  }, [me, filter]);
 
   async function onChange(
     id: string,
@@ -47,84 +54,91 @@ export default function MaintenancePage() {
     setRequests(await listMaintenance(filter || undefined));
   }
 
+  if (!me) return null;
+
   return (
-    <main className="mx-auto max-w-3xl p-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Maintenance</h1>
-        <select
-          aria-label="Filter status"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as MaintenanceStatus | "")}
-          className="rounded border px-3 py-2"
-        >
-          <option value="">All statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </div>
-      <ul className="space-y-3">
+    <AppShell me={me} unread={unread} onLogOut={logOut}>
+      <PageHeader
+        title="Maintenance"
+        actions={
+          <Select
+            aria-label="Filter status"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as MaintenanceStatus | "")}
+            className="w-48"
+          >
+            <option value="">All statuses</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
+        }
+      />
+      <DataList>
         {requests.map((m) => (
-          <li key={m.id} className="rounded border p-3 text-sm">
-            <div className="flex justify-between">
-              <span className="font-medium text-gray-800">
+          <DataRow key={m.id}>
+            <div className="flex flex-wrap justify-between gap-2">
+              <span className="font-medium text-text">
                 {m.property_address} · {m.title}
               </span>
-              <span className="text-xs text-gray-500">by {m.reported_by}</span>
+              <span className="flex items-center gap-2">
+                <Badge tone={PRIORITY_TONES[m.priority]}>{m.priority}</Badge>
+                <Badge tone={STATUS_TONES[m.status]}>{m.status}</Badge>
+                <span className="text-xs text-muted">by {m.reported_by}</span>
+              </span>
             </div>
-            <p className="text-gray-600">{m.description}</p>
+            <p className="mt-1 text-muted">{m.description}</p>
             {m.image_urls.length > 0 && (
-              <div className="mt-1 flex gap-1">
+              <div className="mt-2 flex gap-1">
                 {m.image_urls.map((u) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={u}
                     src={`${API_BASE_URL}${u}`}
                     alt=""
-                    className="h-14 w-14 rounded object-cover"
+                    className="h-14 w-14 rounded-lg object-cover"
                   />
                 ))}
               </div>
             )}
             <div className="mt-2 flex gap-2">
-              <select
+              <Select
                 aria-label="Status"
                 value={m.status}
                 onChange={(e) => onChange(m.id, { status: e.target.value as MaintenanceStatus })}
-                className="rounded border px-2 py-1"
+                className="w-40"
               >
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
                 ))}
-              </select>
-              <select
+              </Select>
+              <Select
                 aria-label="Set priority"
                 value={m.priority}
                 onChange={(e) =>
                   onChange(m.id, { priority: e.target.value as MaintenancePriority })
                 }
-                className="rounded border px-2 py-1"
+                className="w-40"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
-          </li>
+          </DataRow>
         ))}
-        {requests.length === 0 && <li className="text-gray-500">No maintenance requests yet.</li>}
-      </ul>
-      <p className="mt-6">
-        <Link href="/app" className="text-blue-600">
-          Back to dashboard
-        </Link>
-      </p>
-    </main>
+        {requests.length === 0 && (
+          <DataRow>
+            <EmptyState>No maintenance requests yet.</EmptyState>
+          </DataRow>
+        )}
+      </DataList>
+    </AppShell>
   );
 }
