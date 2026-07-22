@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api";
+import { AuthFrame } from "@/components/auth-frame";
+import { Button, Input } from "@/components/ui";
 
 function ResetForm() {
   const router = useRouter();
@@ -27,7 +29,7 @@ function ResetForm() {
 
   if (!token) {
     return (
-      <p data-testid="missing-token" className="text-sm text-red-600">
+      <p data-testid="missing-token" className="text-sm text-danger">
         This reset link is invalid or missing its token.
       </p>
     );
@@ -35,42 +37,38 @@ function ResetForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <p className="text-sm text-gray-600">Enter your new password.</p>
+      <p className="text-sm text-muted">Enter your new password.</p>
       {error && (
-        <p className="text-sm text-red-600" role="alert">
+        <p className="text-sm text-danger" role="alert">
           {error}
         </p>
       )}
-      <input
+      <Input
         type="password"
         required
         minLength={8}
         placeholder="New password (min 8 chars)"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded border px-3 py-2"
       />
-      <button type="submit" className="w-full rounded bg-blue-600 py-2 text-white">
+      <Button type="submit" className="w-full">
         Update password
-      </button>
+      </Button>
     </form>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm space-y-4 rounded-lg bg-white p-8 shadow">
-        <h1 className="text-2xl font-semibold">Set a new password</h1>
-        <Suspense>
-          <ResetForm />
-        </Suspense>
-        <p className="text-sm text-gray-600">
-          <Link href="/login" className="text-blue-600">
-            Back to log in
-          </Link>
-        </p>
-      </div>
-    </main>
+    <AuthFrame title="Set a new password">
+      <Suspense>
+        <ResetForm />
+      </Suspense>
+      <p className="text-sm">
+        <Link href="/login" className="text-brand">
+          Back to log in
+        </Link>
+      </p>
+    </AuthFrame>
   );
 }

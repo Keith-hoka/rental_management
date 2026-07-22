@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api";
 import { saveTokens, type TokenPair } from "@/lib/auth";
+import { AuthFrame } from "@/components/auth-frame";
+import { Button, Input } from "@/components/ui";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -36,58 +38,45 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm space-y-4 rounded-lg bg-white p-8 shadow"
-      >
-        <h1 className="text-2xl font-semibold">Create account</h1>
+    <AuthFrame title="Create account">
+      <form onSubmit={onSubmit} className="space-y-4">
         {error && (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="text-sm text-danger" role="alert">
             {error}
           </p>
         )}
-        <input
-          required
-          placeholder="Your name"
-          value={form.name}
-          onChange={update("name")}
-          className="w-full rounded border px-3 py-2"
-        />
-        <input
+        <Input required placeholder="Your name" value={form.name} onChange={update("name")} />
+        <Input
           required
           placeholder="Organization name"
           value={form.organization_name}
           onChange={update("organization_name")}
-          className="w-full rounded border px-3 py-2"
         />
-        <input
+        <Input
           type="email"
           required
           placeholder="Email"
           value={form.email}
           onChange={update("email")}
-          className="w-full rounded border px-3 py-2"
         />
-        <input
+        <Input
           type="password"
           required
           minLength={8}
           placeholder="Password (min 8 chars)"
           value={form.password}
           onChange={update("password")}
-          className="w-full rounded border px-3 py-2"
         />
-        <button type="submit" className="w-full rounded bg-blue-600 py-2 text-white">
+        <Button type="submit" className="w-full">
           Sign up
-        </button>
-        <p className="text-sm text-gray-600">
+        </Button>
+        <p className="text-sm text-muted">
           Have an account?{" "}
-          <Link href="/login" className="text-blue-600">
+          <Link href="/login" className="text-brand">
             Log in
           </Link>
         </p>
       </form>
-    </main>
+    </AuthFrame>
   );
 }
