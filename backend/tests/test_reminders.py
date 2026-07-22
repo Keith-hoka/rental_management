@@ -148,3 +148,21 @@ async def test_email_failure_still_records(client, db_session, monkeypatch):
         .all()
     )
     assert any(str(r.lease_id) == lease_id for r in rows)
+
+
+async def test_renewed_leases_stop_getting_expiry_reminders(client, db_session, captured):
+    headers = await landlord_headers(client, "renewed@example.com")
+    property_id = await make_property(client, headers, "9 Reminder St")
+    today = date.today()
+    lease_id = await _make_lease(client, headers, property_id, end_date=today + timedelta(days=7))
+
+    await client.post(
+        f"/api/v1/leases/{lease_id}/renew",
+        json={"end_date": str(today + timedelta(days=372))},
+        headers=headers,
+    )
+
+    sent = await run_expiry_reminders(db_session, today)
+
+    assert sent == 0, "a renewed lease should not generate an expiry reminder"
+    assert captured == [], "no reminder email should go out for a renewed lease"

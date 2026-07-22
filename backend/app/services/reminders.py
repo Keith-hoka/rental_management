@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.config import settings
 from app.models import Lease, LeaseReminder, Property
@@ -28,11 +29,22 @@ def _bucket(days_left: int, thresholds: list[int]) -> int | None:
 async def _expiring_leases(
     session: AsyncSession, today: date, window_end: date
 ) -> list[tuple[Lease, str]]:
-    """Leases (with property address) whose end_date is in [today, window_end], all orgs."""
+    """Leases (with address) ending in [today, window_end] that have no successor.
+
+    A renewed lease is excluded: reminding someone that a lease they already
+    renewed is about to expire is noise.
+    """
+    # aliased, not Lease itself: an unaliased subquery would reference the same
+    # entity as the outer select and correlate to itself.
+    successor = aliased(Lease)
     result = await session.execute(
         select(Lease, Property.address)
         .join(Property, Property.id == Lease.property_id)
-        .where(Lease.end_date >= today, Lease.end_date <= window_end)
+        .where(
+            Lease.end_date >= today,
+            Lease.end_date <= window_end,
+            ~select(successor.id).where(successor.renewed_from_id == Lease.id).exists(),
+        )
     )
     return list(result.all())
 

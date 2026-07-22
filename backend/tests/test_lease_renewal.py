@@ -1,8 +1,10 @@
 import uuid
+from datetime import date, timedelta
 
 from sqlalchemy import select
 
-from app.models import Lease, Notification
+from app.models import Charge, Lease, Notification
+from app.services.charges import generate_charges
 from tests.test_leases import lease_body, make_property
 from tests.test_portal import onboard_tenant
 from tests.test_properties_crud import landlord_headers
@@ -174,3 +176,40 @@ async def test_renewal_notifies_tenant_and_manager(client, db_session):
     # One landlord plus one onboarded tenant.
     assert len(rows) == 2
     assert all(row.link == f"/app/leases/{renewal['id']}" for row in rows)
+
+
+async def test_charges_are_generated_for_the_renewal(client, db_session):
+    headers = await landlord_headers(client)
+    property_id = await make_property(client, headers, "11 Charge St")
+    today = date.today()
+    lease = (
+        await client.post(
+            f"/api/v1/properties/{property_id}/leases",
+            json=lease_body(
+                start_date=str(today - timedelta(days=1)),
+                end_date=str(today + timedelta(days=3)),
+            ),
+            headers=headers,
+        )
+    ).json()
+    renewal = (
+        await client.post(
+            f"/api/v1/leases/{lease['id']}/renew",
+            json={"end_date": str(today + timedelta(days=120)), "rent_frequency": "weekly"},
+            headers=headers,
+        )
+    ).json()
+
+    await generate_charges(db_session, today)
+
+    charges = (
+        (
+            await db_session.execute(
+                select(Charge).where(Charge.lease_id == uuid.UUID(renewal["id"]))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert charges, "the successor lease produced no rent charges"
+    assert all(c.period_start >= date.fromisoformat(renewal["start_date"]) for c in charges)
