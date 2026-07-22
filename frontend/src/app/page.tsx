@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ui";
 
 const POINTS = [
   { title: "Rent collection", body: "Charges generate themselves and payments settle oldest first." },
@@ -8,7 +9,10 @@ const POINTS = [
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
+    <main className="relative flex min-h-screen items-center justify-center bg-canvas p-6">
+      <div className="absolute top-6 right-6">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-2xl">
         <div className="mb-6 flex items-center justify-center gap-2">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-semibold text-white">

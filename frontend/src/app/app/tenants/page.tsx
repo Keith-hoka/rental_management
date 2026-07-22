@@ -34,17 +34,15 @@ export default function TenantsPage() {
 
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
-      <PageHeader
-        title="Tenants"
-        actions={
-          <Input
-            placeholder="Search tenants"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-64"
-          />
-        }
-      />
+      <PageHeader title="Tenants" />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Input
+          placeholder="Search tenants"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+      </div>
       <DataList>
         {shown.map((t, i) => (
           <DataRow key={`${t.lease_id}-${t.email}-${i}`}>

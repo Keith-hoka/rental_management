@@ -52,12 +52,13 @@ function LoginForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <p className="mb-2 text-sm text-muted">Select who you are and get started</p>
-        {/* inline-flex with content-sized segments: equal thirds are too narrow
+        {/* Full width to line up with the inputs and the submit button, but the
+            segments stay content-sized and spread: equal thirds are too narrow
             for "Property manager", which then wraps onto two lines. */}
         <div
           role="radiogroup"
           aria-label="Role"
-          className="inline-flex gap-1 rounded-lg border border-border bg-surface-2 p-1"
+          className="flex justify-between gap-1 rounded-lg border border-border bg-surface-2 p-1"
         >
           {ROLES.map((option) => (
             <button
