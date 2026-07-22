@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import select
 
 from app.models import Notification, User
@@ -88,3 +89,90 @@ async def test_tenant_cancel_notifies_managers(client, db_session):
         "maintenance_cancelled",
         "maintenance_new",
     ]
+
+
+CONTRACTOR = {
+    "name": "Bob's Plumbing",
+    "trade": "Plumber",
+    "phone": "0400 123 456",
+    "email": "bob@example.com",
+}
+REQ_A = {"title": "Broken heater", "description": "No hot water", "priority": "urgent"}
+
+
+@pytest.fixture
+def sent(monkeypatch):
+    """Collect (to, subject) for every email the service sends."""
+    calls: list[tuple[str, str]] = []
+
+    async def fake_send(to, subject, html):
+        calls.append((to, subject))
+
+    monkeypatch.setattr("app.services.notify.send_email", fake_send)
+    return calls
+
+
+async def _seed_for_assign(client, db_session, prefix):
+    headers = await landlord_headers(client, f"{prefix}@example.com")
+    lease_id = await make_lease(client, headers, f"{prefix} Street")
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, f"{prefix}-t@example.com")
+    rid = (
+        await client.post(f"/api/v1/me/leases/{lease_id}/maintenance", json=REQ_A, headers=tenant)
+    ).json()["id"]
+    return headers, tenant, rid
+
+
+async def test_assign_emails_the_contractor(client, db_session, sent):
+    headers, _, rid = await _seed_for_assign(client, db_session, "wo")
+    cid = (await client.post("/api/v1/contractors", json=CONTRACTOR, headers=headers)).json()["id"]
+    sent.clear()
+
+    await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+
+    assert ("bob@example.com", "Maintenance job - wo Street") in sent
+
+
+async def test_contractor_without_email_gets_no_work_order(client, db_session, sent):
+    headers, _, rid = await _seed_for_assign(client, db_session, "noem")
+    cid = (
+        await client.post(
+            "/api/v1/contractors",
+            json={"name": "Phone Only", "phone": "0400 000 000"},
+            headers=headers,
+        )
+    ).json()["id"]
+    sent.clear()
+
+    response = await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+
+    assert response.status_code == 200, "the assignment must succeed without an email address"
+    assert sent == []
+
+
+async def test_assign_notifies_the_tenant(client, db_session, sent):
+    headers, _, rid = await _seed_for_assign(client, db_session, "asgn")
+    cid = (await client.post("/api/v1/contractors", json=CONTRACTOR, headers=headers)).json()["id"]
+
+    await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+
+    tenant_id = await _user_id(db_session, "asgn-t@example.com")
+    assert "maintenance_assigned" in await _categories(db_session, tenant_id)
+
+
+async def test_unassign_sends_nothing(client, db_session, sent):
+    headers, _, rid = await _seed_for_assign(client, db_session, "unas")
+    cid = (await client.post("/api/v1/contractors", json=CONTRACTOR, headers=headers)).json()["id"]
+    await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+    sent.clear()
+
+    await client.delete(f"/api/v1/maintenance/{rid}/assign", headers=headers)
+
+    assert sent == []

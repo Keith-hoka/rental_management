@@ -130,3 +130,26 @@ async def test_cancel_resolved_conflicts(client, db_session):
 
     resp = await client.post(f"/api/v1/me/maintenance/{rid}/cancel", headers=tenant)
     assert resp.status_code == 409
+
+
+async def test_tenant_sees_the_assigned_contractor(client, db_session):
+    headers = await landlord_headers(client, "tsee@example.com")
+    lease_id = await make_lease(client, headers, "Tenant Sees St")
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, "tsee-t@example.com")
+    rid = (
+        await client.post(f"/api/v1/me/leases/{lease_id}/maintenance", json=REQ, headers=tenant)
+    ).json()["id"]
+    cid = (
+        await client.post(
+            "/api/v1/contractors",
+            json={"name": "Bob's Plumbing", "phone": "0400 123 456"},
+            headers=headers,
+        )
+    ).json()["id"]
+    await client.post(
+        f"/api/v1/maintenance/{rid}/assign", json={"contractor_id": cid}, headers=headers
+    )
+
+    mine = (await client.get(f"/api/v1/me/leases/{lease_id}/maintenance", headers=tenant)).json()
+    assert mine[0]["contractor_name"] == "Bob's Plumbing"
+    assert mine[0]["contractor_phone"] == "0400 123 456"

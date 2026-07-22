@@ -22,6 +22,7 @@ from app.routers.leases import manager
 from app.schemas.contractor import AssignContractor
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceInfo, MaintenanceUpdate
 from app.services.maintenance_notify import (
+    notify_assigned,
     notify_cancelled,
     notify_new_request,
     notify_status_change,
@@ -236,6 +237,7 @@ async def assign_contractor(
     request.contractor_id = contractor.id
     await session.commit()
     await session.refresh(request)
+    await notify_assigned(session, request, contractor)
     return await _to_info(session, request)
 
 

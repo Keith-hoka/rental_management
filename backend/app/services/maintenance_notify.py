@@ -4,8 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import MaintenanceRequest, Property
+from app.models import Contractor, MaintenanceRequest, Property
 from app.services.notify import (
+    lease_tenant_user_ids,
     manager_emails,
     manager_user_ids,
     notify_users,
@@ -98,3 +99,37 @@ async def notify_cancelled(session: AsyncSession, request: MaintenanceRequest) -
         f"{request.title} at {address} was cancelled by the tenant.",
         MANAGER_LINK,
     )
+
+
+async def notify_assigned(
+    session: AsyncSession, request: MaintenanceRequest, contractor: Contractor
+) -> None:
+    """Send the contractor their work order and tell the tenants who is coming.
+
+    The work order deliberately omits the tenant's phone number. Giving a tenant
+    a contractor's details is the manager sharing their own supplier; giving an
+    outside contractor the tenant's number shares data the tenant never agreed
+    to share. The address, issue and a manager to reply to are enough.
+    """
+    address = await _address(session, request)
+    if contractor.email:
+        managers = await manager_emails(session, request.organization_id)
+        reply_to = managers[0] if managers else settings.email_from
+        await safe_send(
+            contractor.email,
+            f"Maintenance job - {address}",
+            f"<p>{request.title} at {address} ({request.priority.value} priority).</p>"
+            f"<p>{request.description}</p>"
+            f"<p>Reply to {reply_to}.</p>",
+        )
+
+    await notify_users(
+        session,
+        await lease_tenant_user_ids(session, request.lease_id),
+        request.organization_id,
+        "maintenance_assigned",
+        "Contractor assigned",
+        f"{contractor.name} has been assigned to {request.title} at {address}.",
+        TENANT_LINK,
+    )
+    await session.commit()
