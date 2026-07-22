@@ -98,7 +98,7 @@ export default function MessagesPage() {
             <p className="text-muted">{n.body}</p>
             <div className="mt-1 flex items-center gap-3">
               {n.link && (
-                <Link href={n.link} className="text-xs text-brand">
+                <Link href={n.link} className="text-xs text-brand-fg">
                   View
                 </Link>
               )}

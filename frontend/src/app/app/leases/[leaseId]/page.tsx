@@ -570,7 +570,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
         {editing ? (
           <button
             type="button"
-            className="text-brand"
+            className="text-brand-fg"
             onClick={() => {
               setEditing(false);
               setForm(null);
@@ -579,7 +579,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             Back
           </button>
         ) : (
-          <Link href="/app/leases" className="text-brand">
+          <Link href="/app/leases" className="text-brand-fg">
             Back
           </Link>
         )}

@@ -358,7 +358,7 @@ export default function DashboardPage() {
         <Card
           title="My properties"
           actions={
-            <Link href="/app/properties" className="text-sm text-brand">
+            <Link href="/app/properties" className="text-sm text-brand-fg">
               View all
             </Link>
           }

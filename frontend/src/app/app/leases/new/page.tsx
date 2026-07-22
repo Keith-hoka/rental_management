@@ -190,7 +190,7 @@ export default function NewLeasePage() {
         </form>
       </Card>
       <p className="mx-auto mt-4 max-w-2xl">
-        <Link href="/app/leases" className="text-brand">
+        <Link href="/app/leases" className="text-brand-fg">
           Back
         </Link>
       </p>

@@ -58,7 +58,7 @@ export default function TenantsPage() {
                 <Badge tone={t.joined ? "success" : "neutral"}>
                   {t.joined ? "Joined" : "Not joined"}
                 </Badge>
-                <Link href={`/app/leases/${t.lease_id}`} className="text-brand">
+                <Link href={`/app/leases/${t.lease_id}`} className="text-brand-fg">
                   {t.property_address}
                 </Link>
               </span>

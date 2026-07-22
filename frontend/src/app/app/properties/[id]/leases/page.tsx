@@ -30,7 +30,7 @@ export default function PropertyLeasesPage({ params }: { params: Promise<{ id: s
       <PageHeader title="Leases" />
       <p className="mb-4 text-sm text-muted">
         This property&apos;s leases. Add new leases from the{" "}
-        <Link href="/app/leases" className="text-brand">
+        <Link href="/app/leases" className="text-brand-fg">
           Leases page
         </Link>
         .
@@ -53,7 +53,7 @@ export default function PropertyLeasesPage({ params }: { params: Promise<{ id: s
         )}
       </DataList>
       <p className="mt-6">
-        <Link href={`/app/properties/${id}`} className="text-brand">
+        <Link href={`/app/properties/${id}`} className="text-brand-fg">
           Back
         </Link>
       </p>

@@ -172,7 +172,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             </Card>
 
             <p className="mt-6">
-              <Link href="/app/properties" className="text-brand">
+              <Link href="/app/properties" className="text-brand-fg">
                 Back
               </Link>
             </p>

@@ -259,7 +259,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             </Button>
           </Card>
           <p className="mx-auto mt-4 max-w-2xl">
-            <Link href={`/app/properties/${id}`} className="text-brand">
+            <Link href={`/app/properties/${id}`} className="text-brand-fg">
               Back
             </Link>
           </p>

@@ -176,7 +176,7 @@ export default function NewPropertyPage() {
         </form>
       </Card>
       <p className="mx-auto mt-4 max-w-2xl">
-        <Link href="/app/properties" className="text-brand">
+        <Link href="/app/properties" className="text-brand-fg">
           Back
         </Link>
       </p>

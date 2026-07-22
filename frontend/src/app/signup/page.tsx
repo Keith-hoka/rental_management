@@ -72,7 +72,7 @@ export default function SignupPage() {
         </Button>
         <p className="text-sm text-muted">
           Have an account?{" "}
-          <Link href="/login" className="text-brand">
+          <Link href="/login" className="text-brand-fg">
             Log in
           </Link>
         </p>

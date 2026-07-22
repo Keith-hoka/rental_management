@@ -74,7 +74,7 @@ export default function AcceptInvitePage() {
         <AcceptForm />
       </Suspense>
       <p className="text-sm">
-        <Link href="/login" className="text-brand">
+        <Link href="/login" className="text-brand-fg">
           Back to log in
         </Link>
       </p>
