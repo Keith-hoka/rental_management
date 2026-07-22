@@ -27,7 +27,7 @@ from app.schemas.charge import ChargeInfo
 from app.services.invites import reject_duplicate_invite
 from app.services.payments import lease_statuses
 from app.schemas.invitation import InvitationResponse
-from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
+from app.schemas.lease import LeaseCreate, LeaseRenew, LeaseResponse, LeaseSummary, LeaseUpdate
 from app.schemas.tenant import (
     TenantDirectoryEntry,
     LeaseInvitationInfo,
@@ -99,6 +99,56 @@ async def get_owned_lease(
     return lease
 
 
+async def successor_id(session: AsyncSession, lease_id: uuid.UUID) -> uuid.UUID | None:
+    """The id of the lease that renewed this one, if it has been renewed."""
+    return (
+        await session.execute(select(Lease.id).where(Lease.renewed_from_id == lease_id))
+    ).scalar_one_or_none()
+
+
+@router.post("/leases/{lease_id}/renew", status_code=201, response_model=LeaseResponse)
+async def renew_lease(
+    lease_id: uuid.UUID,
+    body: LeaseRenew,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Lease:
+    """Create a successor lease for the same tenants, linked back to the source."""
+    source = await get_owned_lease(lease_id, membership, session)
+    if await successor_id(session, lease_id) is not None:
+        raise HTTPException(status_code=409, detail="Lease has already been renewed")
+
+    start = body.start_date or source.end_date + timedelta(days=1)
+    if start > body.end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date")
+    if await overlapping_lease_exists(session, source.property_id, start, body.end_date):
+        raise HTTPException(status_code=409, detail="Lease dates overlap an existing lease")
+
+    renewal = Lease(
+        organization_id=source.organization_id,
+        property_id=source.property_id,
+        tenant_name=source.tenant_name,
+        tenant_email=source.tenant_email,
+        tenant_phone=source.tenant_phone,
+        co_tenants=source.co_tenants,
+        rent_amount=body.rent_amount if body.rent_amount is not None else source.rent_amount,
+        rent_frequency=body.rent_frequency or source.rent_frequency,
+        bond_amount=body.bond_amount if body.bond_amount is not None else source.bond_amount,
+        notice_period_days=(
+            body.notice_period_days
+            if body.notice_period_days is not None
+            else source.notice_period_days
+        ),
+        start_date=start,
+        end_date=body.end_date,
+        renewed_from_id=source.id,
+    )
+    session.add(renewal)
+    await session.commit()
+    await session.refresh(renewal)
+    return renewal
+
+
 @router.get("/properties/{property_id}/leases", response_model=list[LeaseResponse])
 async def list_leases(
     property_id: uuid.UUID,
@@ -118,9 +168,16 @@ async def get_lease(
     lease_id: uuid.UUID,
     membership: Membership = Depends(manager),
     session: AsyncSession = Depends(get_session),
-) -> Lease:
-    """Fetch a single lease in the caller's organization."""
-    return await get_owned_lease(lease_id, membership, session)
+) -> LeaseResponse:
+    """Fetch a single lease in the caller's organization, including its renewal link.
+
+    Only this endpoint resolves the reverse link; the list endpoints would pay one
+    extra query per lease for a value nothing renders.
+    """
+    lease = await get_owned_lease(lease_id, membership, session)
+    response = LeaseResponse.model_validate(lease)
+    response.renewed_to_id = await successor_id(session, lease_id)
+    return response
 
 
 @router.patch("/leases/{lease_id}", response_model=LeaseResponse)

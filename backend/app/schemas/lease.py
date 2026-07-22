@@ -40,6 +40,17 @@ class LeaseUpdate(BaseModel):
     end_date: date | None = None
 
 
+class LeaseRenew(BaseModel):
+    """Terms for the successor lease. Tenant identity is copied, never supplied."""
+
+    end_date: date
+    start_date: date | None = None
+    rent_amount: Decimal | None = None
+    rent_frequency: LeaseFrequency | None = None
+    bond_amount: Decimal | None = None
+    notice_period_days: int | None = None
+
+
 class LeaseResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -56,6 +67,8 @@ class LeaseResponse(BaseModel):
     start_date: date
     end_date: date
     created_at: datetime
+    renewed_from_id: uuid.UUID | None = None
+    renewed_to_id: uuid.UUID | None = None
 
 
 class LeaseSummary(BaseModel):
