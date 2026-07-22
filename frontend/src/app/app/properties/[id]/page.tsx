@@ -2,7 +2,6 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import {
   deleteProperty,
@@ -78,15 +77,17 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
-      <PageHeader title="Edit property" />
-      {error && (
-        <p className="mb-3 text-sm text-danger" role="alert">
-          {error}
-        </p>
-      )}
+      <div className="mx-auto max-w-2xl">
+        <PageHeader title="Edit property" />
+        {error && (
+          <p className="mb-3 text-sm text-danger" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
       {!prop ? null : (
         <>
-          <Card className="mb-4 max-w-2xl">
+          <Card className="mx-auto mb-4 max-w-2xl">
             {prop.active_lease ? (
               <>
                 <p className="font-medium text-text">
@@ -105,7 +106,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             )}
           </Card>
 
-          <Card className="max-w-2xl">
+          <Card className="mx-auto max-w-2xl">
             <form onSubmit={onSave} className="space-y-3">
               <Input
                 required
@@ -198,11 +199,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           </Card>
         </>
       )}
-      <p className="mt-4">
-        <Link href="/app/properties" className="text-brand">
-          Back to properties
-        </Link>
-      </p>
 
       {confirming && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">

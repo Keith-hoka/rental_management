@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { createProperty, uploadPropertyImage, type PropertyInput } from "@/lib/properties";
 import { AppShell } from "@/components/app-shell";
@@ -48,8 +47,10 @@ export default function NewPropertyPage() {
 
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
-      <PageHeader title="New property" />
-      <Card className="max-w-2xl">
+      <div className="mx-auto max-w-2xl">
+        <PageHeader title="New property" />
+      </div>
+      <Card className="mx-auto max-w-2xl">
         {error && (
           <p className="mb-3 text-sm text-danger" role="alert">
             {error}
@@ -130,11 +131,6 @@ export default function NewPropertyPage() {
           </Button>
         </form>
       </Card>
-      <p className="mt-4">
-        <Link href="/app/properties" className="text-brand">
-          Back to properties
-        </Link>
-      </p>
     </AppShell>
   );
 }
