@@ -36,6 +36,12 @@ def roster_emails(lease: Lease) -> list[str]:
     return [lease.tenant_email] + [c["email"] for c in lease.co_tenants]
 
 
+async def user_emails(session: AsyncSession, user_ids) -> list[str]:
+    """The emails of specific users."""
+    result = await session.execute(select(User.email).where(User.id.in_(user_ids)))
+    return [email for (email,) in result.all()]
+
+
 async def manager_user_ids(session: AsyncSession, organization_id) -> list[uuid.UUID]:
     """User ids of the landlords and property managers in the organization."""
     result = await session.execute(

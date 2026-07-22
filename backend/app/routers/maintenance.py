@@ -18,6 +18,11 @@ from app.models import (
 )
 from app.routers.leases import manager
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceInfo, MaintenanceUpdate
+from app.services.maintenance_notify import (
+    notify_cancelled,
+    notify_new_request,
+    notify_status_change,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["maintenance"])
 
@@ -107,6 +112,7 @@ async def create_request(
     session.add(request)
     await session.commit()
     await session.refresh(request)
+    await notify_new_request(session, request)
     return await _to_info(session, request)
 
 
@@ -155,6 +161,7 @@ async def cancel_request(
     request.status = MaintenanceStatus.cancelled
     await session.commit()
     await session.refresh(request)
+    await notify_cancelled(session, request)
     return await _to_info(session, request)
 
 
@@ -193,8 +200,11 @@ async def update_request(
 ) -> MaintenanceInfo:
     """Update a request's status and/or priority."""
     request = await get_owned_request(request_id, membership, session)
+    previous_status = request.status
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(request, field, value)
     await session.commit()
     await session.refresh(request)
+    if request.status != previous_status:
+        await notify_status_change(session, request)
     return await _to_info(session, request)
