@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { listProperties, type Property } from "@/lib/properties";
+import { formatAddress, listProperties, type Property } from "@/lib/properties";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
 import {
@@ -63,7 +63,7 @@ export default function PropertiesPage() {
           <DataRow key={p.id}>
             <div className="flex flex-wrap items-center gap-2">
               <Link href={`/app/properties/${p.id}`} className="font-medium text-text">
-                {p.address}
+                {formatAddress(p)}
               </Link>
               <span data-testid="status" className="text-muted">
                 {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking

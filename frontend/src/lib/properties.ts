@@ -16,6 +16,7 @@ export interface Property {
   id: string;
   organization_id: string;
   address: string;
+  city: string | null;
   state: string | null;
   postcode: string | null;
   type: PropertyType;
@@ -30,6 +31,7 @@ export interface Property {
 
 export interface PropertyInput {
   address: string;
+  city: string;
   state: string;
   postcode: string;
   type: PropertyType;
@@ -89,6 +91,12 @@ export async function uploadPropertyImage(id: string, file: File): Promise<Prope
 export function deletePropertyImage(id: string, url: string) {
   const query = encodeURIComponent(url);
   return apiFetch<Property>(`/api/v1/properties/${id}/images?url=${query}`, { method: "DELETE" });
+}
+
+/** One line: "42 Test Lane, Sydney NSW 2000". Unset parts are left out. */
+export function formatAddress(p: Property): string {
+  const region = [p.city, p.state, p.postcode].filter(Boolean).join(" ");
+  return region ? `${p.address}, ${region}` : p.address;
 }
 
 /** Resolve a stored image URL (relative /uploads/... or absolute) to a full src. */

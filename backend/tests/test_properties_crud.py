@@ -100,28 +100,31 @@ async def test_delete_property_in_other_org_is_404(client):
     assert response.status_code == 404
 
 
-async def test_create_and_update_state_and_postcode(client):
+async def test_create_and_update_city_state_and_postcode(client):
     headers = await landlord_headers(client, "region@example.com")
     created = await client.post(
         "/api/v1/properties",
-        json={**NEW_PROPERTY, "state": "NSW", "postcode": "2000"},
+        json={**NEW_PROPERTY, "city": "Sydney", "state": "NSW", "postcode": "2000"},
         headers=headers,
     )
     assert created.status_code == 201
+    assert created.json()["city"] == "Sydney"
     assert created.json()["state"] == "NSW"
     assert created.json()["postcode"] == "2000"
 
     updated = await client.patch(
         f"/api/v1/properties/{created.json()['id']}",
-        json={"state": "VIC", "postcode": "3000"},
+        json={"city": "Melbourne", "state": "VIC", "postcode": "3000"},
         headers=headers,
     )
+    assert updated.json()["city"] == "Melbourne"
     assert updated.json()["state"] == "VIC"
     assert updated.json()["postcode"] == "3000"
 
 
-async def test_state_and_postcode_default_to_null(client):
+async def test_city_state_and_postcode_default_to_null(client):
     headers = await landlord_headers(client, "noregion@example.com")
     response = await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=headers)
+    assert response.json()["city"] is None
     assert response.json()["state"] is None
     assert response.json()["postcode"] is None

@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { getProperty, imageSrc, type Property } from "@/lib/properties";
+import { formatAddress, getProperty, imageSrc, type Property } from "@/lib/properties";
 import { getLeaseBalance, listLeasePayments, type BalanceInfo } from "@/lib/payments";
 import { listMaintenance, type MaintenanceInfo } from "@/lib/maintenance";
 import { AppShell } from "@/components/app-shell";
@@ -69,7 +69,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         {prop && (
           <>
             <PageHeader
-              title={prop.address}
+              title={formatAddress(prop)}
               actions={
                 <>
                   <Link href={`/app/properties/${id}/leases`} className={linkButton}>
@@ -115,15 +115,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 />
               </div>
               <p className="mt-3 text-sm text-muted">
-                {[
-                  [prop.state, prop.postcode].filter(Boolean).join(" "),
-                  prop.type,
-                  `${prop.bedrooms} bed`,
-                  `${prop.bathrooms} bath`,
-                  `${prop.parking} parking`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {prop.type} · {prop.bedrooms} bed · {prop.bathrooms} bath · {prop.parking} parking
               </p>
               {prop.description && <p className="mt-1 text-sm text-muted">{prop.description}</p>}
             </Card>

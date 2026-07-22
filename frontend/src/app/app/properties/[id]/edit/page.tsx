@@ -47,6 +47,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     try {
       await updateProperty(id, {
         address: prop.address,
+        city: prop.city ?? "",
         state: prop.state ?? "",
         postcode: prop.postcode ?? "",
         type: prop.type,
@@ -127,6 +128,13 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 onChange={(e) => set("address", e.target.value)}
               />
               <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    placeholder="City"
+                    value={prop.city ?? ""}
+                    onChange={(e) => set("city", e.target.value)}
+                  />
+                </div>
                 <div className="flex-1">
                   <Input
                     placeholder="State / province"
