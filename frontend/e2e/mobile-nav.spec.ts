@@ -27,6 +27,19 @@ test("the sidebar collapses behind a menu button on a narrow screen", async ({ p
   await expect(menu).toHaveAttribute("aria-expanded", "true");
   await expect(nav.getByRole("link", { name: "Properties" })).toBeVisible();
 
+  // The drawer is fixed, so the page must not scroll underneath it, and the bar
+  // must stay put — otherwise scrolling reveals the page through the gap above
+  // the drawer. mouse.wheel, not scrollTo: overflow:hidden blocks the user's
+  // scroll but not a scripted one, so a scripted scroll proves nothing here.
+  await page.mouse.move(195, 400);
+  await page.mouse.wheel(0, 400);
+  await expect
+    .poll(() => page.evaluate(() => Math.round(window.scrollY)))
+    .toBe(0);
+  await expect
+    .poll(() => page.evaluate(() => Math.round(document.querySelector("header")!.getBoundingClientRect().top)))
+    .toBe(0);
+
   // Choosing a destination navigates and puts the menu away again.
   await nav.getByRole("link", { name: "Properties" }).click();
   await expect(page).toHaveURL(/\/app\/properties$/);

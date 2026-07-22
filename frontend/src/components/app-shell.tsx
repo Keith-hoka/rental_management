@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ThemeToggle } from "@/components/ui";
 
 const MANAGE = [
@@ -64,6 +64,17 @@ export function AppShell({
   const isActive = (href: string) =>
     href === "/app" ? pathname === "/app" : pathname.startsWith(href);
 
+  // The drawer is fixed, so without this the page keeps scrolling underneath it.
+  // On <html> because that is the scrolling element here; hiding body overflow
+  // also works, but only via the rule that propagates it to the viewport when
+  // the root is visible, which is a subtlety not worth depending on. A max-md:
+  // class rather than an inline style keeps the breakpoint in CSS, so a resize
+  // past md releases the lock on its own.
+  useEffect(() => {
+    document.documentElement.classList.toggle("max-md:overflow-hidden", open);
+    return () => document.documentElement.classList.remove("max-md:overflow-hidden");
+  }, [open]);
+
   return (
     // h-14 on the bar and top-14 on the drawer are the same 3.5rem: the drawer
     // is fixed, so it has to be told where the bar ends.
@@ -110,7 +121,7 @@ export function AppShell({
         </div>
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 md:px-6">
+        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 md:static md:px-6">
           {/* Below md the brand and the menu button share this bar with the
               theme toggle and the user, so the app has a single top row. */}
           <div className="flex items-center gap-2 md:hidden">
