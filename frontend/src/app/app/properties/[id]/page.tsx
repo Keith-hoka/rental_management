@@ -186,18 +186,17 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   />
                 </label>
               </div>
-              <div className="flex gap-2">
-                <Button type="submit" className="flex-1">
-                  Save
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => router.push("/app/properties")}
-                >
-                  Cancel
-                </Button>
-              </div>
+              <Button type="submit" className="w-full">
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={() => router.push("/app/properties")}
+              >
+                Cancel
+              </Button>
             </form>
             <Button variant="danger" onClick={() => setConfirming(true)} className="mt-3 w-full">
               Delete property

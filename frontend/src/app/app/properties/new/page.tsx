@@ -127,18 +127,17 @@ export default function NewPropertyPage() {
               <p className="mt-1 text-sm text-muted">{files.length} image(s) selected</p>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button type="submit" className="flex-1">
-              Create property
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => router.push("/app/properties")}
-            >
-              Cancel
-            </Button>
-          </div>
+          <Button type="submit" className="w-full">
+            Create property
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            onClick={() => router.push("/app/properties")}
+          >
+            Cancel
+          </Button>
         </form>
       </Card>
       <p className="mx-auto mt-4 max-w-2xl">
