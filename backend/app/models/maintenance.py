@@ -41,6 +41,9 @@ class MaintenanceRequest(Base):
         Enum(MaintenanceStatus), default=MaintenanceStatus.open
     )
     image_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
+    contractor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("contractors.id"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
