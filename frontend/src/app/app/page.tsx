@@ -331,6 +331,9 @@ export default function DashboardPage() {
                     <XAxis dataKey="month" stroke="var(--ink-muted)" fontSize={12} />
                     <YAxis stroke="var(--ink-muted)" fontSize={12} />
                     <Tooltip
+                      // Recharts hardcodes the hover highlight to #ccc, which
+                      // is a bright slab on a dark card.
+                      cursor={{ fill: "var(--surface-2)" }}
                       contentStyle={{
                         background: "var(--surface)",
                         border: "1px solid var(--line)",
