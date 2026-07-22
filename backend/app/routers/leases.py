@@ -25,6 +25,7 @@ from app.models import (
 from app.routers.properties import get_owned_property
 from app.schemas.charge import ChargeInfo
 from app.services.invites import reject_duplicate_invite
+from app.services.notify import lease_tenant_user_ids, manager_user_ids, notify_users
 from app.services.payments import lease_statuses
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseRenew, LeaseResponse, LeaseSummary, LeaseUpdate
@@ -144,6 +145,27 @@ async def renew_lease(
         renewed_from_id=source.id,
     )
     session.add(renewal)
+    # flush, not commit: renewal.id is needed below, but the copy and the
+    # notifications must still land in the same transaction as the lease itself.
+    await session.flush()
+
+    # LeaseTenant is what GET /me/leases reads, so without this copy the tenant
+    # cannot see the lease they were just renewed onto.
+    for user_id in await lease_tenant_user_ids(session, source.id):
+        session.add(LeaseTenant(lease_id=renewal.id, user_id=user_id))
+
+    recipients = await manager_user_ids(session, source.organization_id)
+    recipients += await lease_tenant_user_ids(session, source.id)
+    await notify_users(
+        session,
+        recipients,
+        source.organization_id,
+        "lease_renewal",
+        "Lease renewed",
+        f"The lease for {source.tenant_name} now runs to {renewal.end_date}.",
+        f"/app/leases/{renewal.id}",
+    )
+
     await session.commit()
     await session.refresh(renewal)
     return renewal

@@ -2,8 +2,9 @@ import uuid
 
 from sqlalchemy import select
 
-from app.models import Lease
+from app.models import Lease, Notification
 from tests.test_leases import lease_body, make_property
+from tests.test_portal import onboard_tenant
 from tests.test_properties_crud import landlord_headers
 
 
@@ -127,3 +128,49 @@ async def test_renew_other_org_lease_is_404(client):
     # Not just the status: a missing route also 404s, so this test would pass
     # against no isolation at all. The detail proves get_owned_lease refused it.
     assert response.json()["detail"] == "Lease not found"
+
+
+async def test_renewal_carries_tenant_portal_access(client, db_session):
+    headers = await landlord_headers(client)
+    _, lease = await _make_lease(client, headers)
+    tenant_headers = await onboard_tenant(
+        client, db_session, headers, lease["id"], "renew-tenant@example.com"
+    )
+    renewal = (
+        await client.post(
+            f"/api/v1/leases/{lease['id']}/renew",
+            json={"end_date": "2027-12-31"},
+            headers=headers,
+        )
+    ).json()
+
+    mine = (await client.get("/api/v1/me/leases", headers=tenant_headers)).json()
+    ids = {entry["id"] for entry in mine}
+    assert renewal["id"] in ids, "the tenant cannot see the lease they were renewed onto"
+    assert lease["id"] in ids
+
+
+async def test_renewal_notifies_tenant_and_manager(client, db_session):
+    headers = await landlord_headers(client)
+    _, lease = await _make_lease(client, headers)
+    await onboard_tenant(client, db_session, headers, lease["id"], "renew-notify@example.com")
+    renewal = (
+        await client.post(
+            f"/api/v1/leases/{lease['id']}/renew",
+            json={"end_date": "2027-12-31"},
+            headers=headers,
+        )
+    ).json()
+
+    rows = (
+        (
+            await db_session.execute(
+                select(Notification).where(Notification.category == "lease_renewal")
+            )
+        )
+        .scalars()
+        .all()
+    )
+    # One landlord plus one onboarded tenant.
+    assert len(rows) == 2
+    assert all(row.link == f"/app/leases/{renewal['id']}" for row in rows)
