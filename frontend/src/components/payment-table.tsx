@@ -8,8 +8,10 @@ const COLUMNS = ["Date", "Property info", "Tenant name", "Method", "Amount"];
  * payments: hiding it made the columns look broken rather than empty.
  */
 export function PaymentTable({ payments }: { payments: RecentPayment[] }) {
+  // Already a clipping context for the horizontal scroll, so the radius alone
+  // rounds the header strip's corners.
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-lg">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border bg-surface-2 text-xs text-muted">
           <tr>
