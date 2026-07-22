@@ -17,6 +17,17 @@ class LeaseTenantInfo(BaseModel):
     email: EmailStr
 
 
+class TenantDirectoryEntry(BaseModel):
+    """One person named on a lease roster, whether or not they have an account."""
+
+    name: str
+    email: EmailStr
+    phone: str | None
+    property_address: str
+    lease_id: uuid.UUID
+    joined: bool
+
+
 class LeaseInvitationInfo(BaseModel):
     id: uuid.UUID
     email: EmailStr

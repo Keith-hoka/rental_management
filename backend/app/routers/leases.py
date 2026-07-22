@@ -28,6 +28,7 @@ from app.services.payments import lease_statuses
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
 from app.schemas.tenant import (
+    TenantDirectoryEntry,
     LeaseInvitationInfo,
     LeaseReminderInfo,
     LeaseTenantInfo,
@@ -238,6 +239,51 @@ async def invite_tenant(
         logging.getLogger(__name__).exception("Failed to send invite email to %s", invite.email)
 
     return invite
+
+
+@router.get("/tenants", response_model=list[TenantDirectoryEntry])
+async def list_tenants(
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[TenantDirectoryEntry]:
+    """Everyone named on a lease roster in the organization, main tenants and co-tenants."""
+    result = await session.execute(
+        select(Lease, Property.address)
+        .join(Property, Property.id == Lease.property_id)
+        .where(Lease.organization_id == membership.organization_id)
+        .order_by(Property.address)
+    )
+    rows = list(result.all())
+
+    joined_emails = set(
+        (
+            await session.execute(
+                select(User.email)
+                .join(LeaseTenant, LeaseTenant.user_id == User.id)
+                .where(LeaseTenant.lease_id.in_([lease.id for lease, _ in rows]))
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    entries: list[TenantDirectoryEntry] = []
+    for lease, address in rows:
+        roster = [(lease.tenant_name, lease.tenant_email, lease.tenant_phone)] + [
+            (c["name"], c["email"], c.get("phone")) for c in lease.co_tenants
+        ]
+        for name, email, phone in roster:
+            entries.append(
+                TenantDirectoryEntry(
+                    name=name,
+                    email=email,
+                    phone=phone or None,
+                    property_address=address,
+                    lease_id=lease.id,
+                    joined=email in joined_emails,
+                )
+            )
+    return entries
 
 
 @router.get("/leases/{lease_id}/tenants", response_model=list[LeaseTenantInfo])

@@ -303,7 +303,7 @@ export default function DashboardPage() {
                   value={`${stats.properties_occupied} of ${stats.properties_total} occupied`}
                 />
                 <StatCard label="Active leases" value={String(stats.active_leases)} />
-                <StatCard label="Tenants" value={String(stats.tenants)} />
+                <StatCard label="Maintenance requests" value={String(stats.maintenance_open)} />
               </div>
               <Card title="Monthly income">
                 <ResponsiveContainer width="100%" height={240}>

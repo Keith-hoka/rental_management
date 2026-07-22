@@ -8,6 +8,7 @@ const MANAGE = [
   { href: "/app", label: "Dashboard" },
   { href: "/app/properties", label: "Properties" },
   { href: "/app/leases", label: "Leases" },
+  { href: "/app/tenants", label: "Tenants" },
   { href: "/app/payments", label: "Payments" },
   { href: "/app/maintenance", label: "Maintenance" },
   { href: "/app/messages", label: "Messages" },

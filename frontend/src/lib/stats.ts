@@ -13,6 +13,7 @@ export interface DashboardStats {
   properties_occupied: number;
   active_leases: number;
   tenants: number;
+  maintenance_open: number;
   monthly_income: MonthlyIncome[];
 }
 

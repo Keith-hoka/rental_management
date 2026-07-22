@@ -60,3 +60,16 @@ export function listLeaseReminders(leaseId: string) {
 export function listMyLeases() {
   return apiFetch<TenantLease[]>("/api/v1/me/leases");
 }
+
+export interface TenantDirectoryEntry {
+  name: string;
+  email: string;
+  phone: string | null;
+  property_address: string;
+  lease_id: string;
+  joined: boolean;
+}
+
+export function listTenants() {
+  return apiFetch<TenantDirectoryEntry[]>("/api/v1/tenants");
+}

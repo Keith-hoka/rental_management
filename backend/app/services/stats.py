@@ -6,7 +6,15 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Lease, Membership, Payment, Property, Role
+from app.models import (
+    Lease,
+    MaintenanceRequest,
+    MaintenanceStatus,
+    Membership,
+    Payment,
+    Property,
+    Role,
+)
 from app.schemas.stats import DashboardStats, MonthlyIncome
 from app.services.payments import lease_balance
 
@@ -69,6 +77,15 @@ async def dashboard_stats(session: AsyncSession, organization_id, today: date) -
         .select_from(Membership)
         .where(Membership.organization_id == organization_id, Membership.role == Role.tenant),
     )
+    maintenance_open = await _count(
+        session,
+        select(func.count())
+        .select_from(MaintenanceRequest)
+        .where(
+            MaintenanceRequest.organization_id == organization_id,
+            MaintenanceRequest.status.in_([MaintenanceStatus.open, MaintenanceStatus.in_progress]),
+        ),
+    )
     return DashboardStats(
         outstanding=outstanding,
         overdue=overdue,
@@ -77,5 +94,6 @@ async def dashboard_stats(session: AsyncSession, organization_id, today: date) -
         properties_occupied=len({lease.property_id for lease in active}),
         active_leases=len(active),
         tenants=tenants,
+        maintenance_open=maintenance_open,
         monthly_income=await _monthly_income(session, organization_id, today),
     )

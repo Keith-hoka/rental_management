@@ -11,6 +11,20 @@ async def test_stats_endpoint(client):
     assert len(body["monthly_income"]) == 6
 
 
+async def test_reports_open_maintenance_count(client, db_session):
+    headers = await landlord_headers(client, "statsmaint@example.com")
+    lease_id = await make_lease(client, headers, "Maint Stats St")
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, "statsm-t@example.com")
+    await client.post(
+        f"/api/v1/me/leases/{lease_id}/maintenance",
+        json={"title": "Tap", "description": "Drips", "priority": "low"},
+        headers=tenant,
+    )
+
+    body = (await client.get("/api/v1/stats", headers=headers)).json()
+    assert body["maintenance_open"] == 1
+
+
 async def test_monthly_income_amount_is_a_json_number(client):
     """Recharts cannot plot strings, so the chart series must not be Decimal-as-string."""
     headers = await landlord_headers(client, "statsnum@example.com")

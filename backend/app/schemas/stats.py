@@ -19,4 +19,5 @@ class DashboardStats(BaseModel):
     properties_occupied: int
     active_leases: int
     tenants: int
+    maintenance_open: int
     monthly_income: list[MonthlyIncome]

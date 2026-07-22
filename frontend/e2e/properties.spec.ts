@@ -25,16 +25,19 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/properties$/);
   await expect(page.getByText("42 Test Lane")).toBeVisible();
 
-  // Open it, change the bedroom count, save — returns to the list with the update.
+  // Open it, change the bedroom count, save — returns to the property with the update.
   await page.getByRole("link", { name: "42 Test Lane" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+/);
+  // The property page now shows its details; editing lives behind Edit.
+  await page.getByRole("link", { name: "Edit" }).click();
+  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/edit$/);
   await page.getByLabel("Bedrooms").fill("5");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page).toHaveURL(/\/app\/properties$/);
+  await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+$/);
   await expect(page.getByText(/5 bed/)).toBeVisible();
 
   // Delete it — a confirmation popup must appear before the delete happens.
-  await page.getByRole("link", { name: "42 Test Lane" }).click();
+  await page.getByRole("link", { name: "Edit" }).click();
   await page.getByRole("button", { name: "Delete property" }).click();
   await expect(page.getByText("This cannot be undone")).toBeVisible();
   await page.getByRole("button", { name: "Yes, delete" }).click();
