@@ -12,10 +12,12 @@ from app.models import (
     LeaseTenant,
     MaintenanceRequest,
     MaintenanceStatus,
+    Membership,
     Property,
     User,
 )
-from app.schemas.maintenance import MaintenanceCreate, MaintenanceInfo
+from app.routers.leases import manager
+from app.schemas.maintenance import MaintenanceCreate, MaintenanceInfo, MaintenanceUpdate
 
 router = APIRouter(prefix="/api/v1", tags=["maintenance"])
 
@@ -63,6 +65,23 @@ async def _tenant_request(
         await session.execute(select(MaintenanceRequest).where(MaintenanceRequest.id == request_id))
     ).scalar_one_or_none()
     if request is None or request.created_by != user.id:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return request
+
+
+async def get_owned_request(
+    request_id: uuid.UUID, membership: Membership, session: AsyncSession
+) -> MaintenanceRequest:
+    """Fetch a request in the caller's organization, or raise 404."""
+    request = (
+        await session.execute(
+            select(MaintenanceRequest).where(
+                MaintenanceRequest.id == request_id,
+                MaintenanceRequest.organization_id == membership.organization_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if request is None:
         raise HTTPException(status_code=404, detail="Request not found")
     return request
 
@@ -134,6 +153,48 @@ async def cancel_request(
     if request.status not in (MaintenanceStatus.open, MaintenanceStatus.in_progress):
         raise HTTPException(status_code=409, detail="Request cannot be cancelled")
     request.status = MaintenanceStatus.cancelled
+    await session.commit()
+    await session.refresh(request)
+    return await _to_info(session, request)
+
+
+@router.get("/maintenance", response_model=list[MaintenanceInfo])
+async def list_requests(
+    status: MaintenanceStatus | None = None,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[MaintenanceInfo]:
+    """List the organization's maintenance requests, optionally filtered by status."""
+    query = select(MaintenanceRequest).where(
+        MaintenanceRequest.organization_id == membership.organization_id
+    )
+    if status is not None:
+        query = query.where(MaintenanceRequest.status == status)
+    result = await session.execute(query.order_by(MaintenanceRequest.created_at.desc()))
+    return [await _to_info(session, r) for r in result.scalars().all()]
+
+
+@router.get("/maintenance/{request_id}", response_model=MaintenanceInfo)
+async def get_request(
+    request_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> MaintenanceInfo:
+    """Fetch a single maintenance request in the caller's organization."""
+    return await _to_info(session, await get_owned_request(request_id, membership, session))
+
+
+@router.patch("/maintenance/{request_id}", response_model=MaintenanceInfo)
+async def update_request(
+    request_id: uuid.UUID,
+    body: MaintenanceUpdate,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> MaintenanceInfo:
+    """Update a request's status and/or priority."""
+    request = await get_owned_request(request_id, membership, session)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(request, field, value)
     await session.commit()
     await session.refresh(request)
     return await _to_info(session, request)
