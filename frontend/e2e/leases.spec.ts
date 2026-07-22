@@ -78,7 +78,7 @@ test("adding a lease from the leases page makes a property occupied, deleting it
 
 const navOwner = `lease-nav-${Date.now()}@example.com`;
 
-test("leases are reachable from the dashboard and the properties list", async ({ page }) => {
+test("leases are reachable from the dashboard and a property's detail page", async ({ page }) => {
   await page.goto("/signup");
   await page.getByPlaceholder("Your name").fill("Nav Landlord");
   await page.getByPlaceholder("Organization name").fill("Nav Org");
@@ -111,9 +111,10 @@ test("leases are reachable from the dashboard and the properties list", async ({
   await expect(page.getByRole("link", { name: "9 Overview Ave" })).toBeVisible();
   await expect(page.getByText("active")).toBeVisible();
 
-  // The properties list offers a per-row shortcut to that property's leases.
+  // The property detail page links to that property's own leases.
   // Scoped to main: the sidebar also has a "Leases" link on every page.
   await page.goto("/app/properties");
+  await page.getByRole("link", { name: "9 Overview Ave" }).click();
   await page.getByRole("main").getByRole("link", { name: "Leases" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/leases$/);
 });

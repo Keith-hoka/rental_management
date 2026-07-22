@@ -16,6 +16,8 @@ export interface Property {
   id: string;
   organization_id: string;
   address: string;
+  state: string | null;
+  postcode: string | null;
   type: PropertyType;
   bedrooms: number;
   bathrooms: number;
@@ -28,6 +30,8 @@ export interface Property {
 
 export interface PropertyInput {
   address: string;
+  state: string;
+  postcode: string;
   type: PropertyType;
   bedrooms: number;
   bathrooms: number;

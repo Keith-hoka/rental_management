@@ -11,6 +11,8 @@ import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/comp
 
 const EMPTY: PropertyInput = {
   address: "",
+  state: "",
+  postcode: "",
   type: "house",
   bedrooms: 1,
   bathrooms: 1,
@@ -64,6 +66,22 @@ export default function NewPropertyPage() {
             value={form.address}
             onChange={(e) => set("address", e.target.value)}
           />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                placeholder="State / province"
+                value={form.state}
+                onChange={(e) => set("state", e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                placeholder="Postcode"
+                value={form.postcode}
+                onChange={(e) => set("postcode", e.target.value)}
+              />
+            </div>
+          </div>
           <Select
             value={form.type}
             onChange={(e) => set("type", e.target.value as PropertyInput["type"])}

@@ -42,6 +42,8 @@ def build_property_response(prop: Property, active_lease: Lease | None) -> Prope
         id=prop.id,
         organization_id=prop.organization_id,
         address=prop.address,
+        state=prop.state,
+        postcode=prop.postcode,
         type=prop.type,
         bedrooms=prop.bedrooms,
         bathrooms=prop.bathrooms,

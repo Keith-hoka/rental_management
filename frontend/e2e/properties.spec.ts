@@ -19,6 +19,8 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/properties\/new$/);
   // Exact match: "Address" must not also match the list page's "Search address".
   await page.getByPlaceholder("Address", { exact: true }).fill("42 Test Lane");
+  await page.getByPlaceholder("State / province").fill("NSW");
+  await page.getByPlaceholder("Postcode").fill("2000");
   await page.getByRole("button", { name: "Create property" }).click();
 
   // Returns to the list, where the new property appears.
@@ -31,10 +33,13 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   // The property page now shows its details; editing lives behind Edit.
   await page.getByRole("link", { name: "Edit" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/edit$/);
+  await expect(page.getByPlaceholder("State / province")).toHaveValue("NSW");
+  await page.getByPlaceholder("Postcode").fill("2010");
   await page.getByLabel("Bedrooms").fill("5");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+$/);
   await expect(page.getByText(/5 bed/)).toBeVisible();
+  await expect(page.getByText(/NSW 2010/)).toBeVisible();
 
   // Delete it — a confirmation popup must appear before the delete happens.
   await page.getByRole("link", { name: "Edit" }).click();

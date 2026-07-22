@@ -115,7 +115,15 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 />
               </div>
               <p className="mt-3 text-sm text-muted">
-                {prop.type} · {prop.bedrooms} bed · {prop.bathrooms} bath · {prop.parking} parking
+                {[
+                  [prop.state, prop.postcode].filter(Boolean).join(" "),
+                  prop.type,
+                  `${prop.bedrooms} bed`,
+                  `${prop.bathrooms} bath`,
+                  `${prop.parking} parking`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
               {prop.description && <p className="mt-1 text-sm text-muted">{prop.description}</p>}
             </Card>

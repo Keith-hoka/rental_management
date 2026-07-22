@@ -61,21 +61,14 @@ export default function PropertiesPage() {
       <DataList>
         {properties.map((p) => (
           <DataRow key={p.id}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                <Link href={`/app/properties/${p.id}`} className="font-medium text-text">
-                  {p.address}
-                </Link>
-                <span data-testid="status" className="ml-2 text-muted">
-                  {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking
-                </span>
-                <span className="ml-2">
-                  <Badge tone={p.status === "occupied" ? "success" : "warning"}>{p.status}</Badge>
-                </span>
-              </span>
-              <Link href={`/app/properties/${p.id}/leases`} className="shrink-0 text-brand">
-                Leases
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={`/app/properties/${p.id}`} className="font-medium text-text">
+                {p.address}
               </Link>
+              <span data-testid="status" className="text-muted">
+                {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking
+              </span>
+              <Badge tone={p.status === "occupied" ? "success" : "warning"}>{p.status}</Badge>
             </div>
           </DataRow>
         ))}

@@ -27,6 +27,8 @@ class Property(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     address: Mapped[str] = mapped_column(String(500))
+    state: Mapped[str | None] = mapped_column(String(100))
+    postcode: Mapped[str | None] = mapped_column(String(20))
     type: Mapped[PropertyType] = mapped_column(Enum(PropertyType))
     bedrooms: Mapped[int] = mapped_column(default=0)
     bathrooms: Mapped[int] = mapped_column(default=0)

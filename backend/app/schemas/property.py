@@ -10,6 +10,8 @@ from app.models.property import PropertyStatus, PropertyType
 
 class PropertyCreate(BaseModel):
     address: str
+    state: str | None = None
+    postcode: str | None = None
     type: PropertyType
     bedrooms: int = 0
     bathrooms: int = 0
@@ -20,6 +22,8 @@ class PropertyCreate(BaseModel):
 
 class PropertyUpdate(BaseModel):
     address: str | None = None
+    state: str | None = None
+    postcode: str | None = None
     type: PropertyType | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
@@ -45,6 +49,8 @@ class PropertyResponse(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     address: str
+    state: str | None
+    postcode: str | None
     type: PropertyType
     bedrooms: int
     bathrooms: int
