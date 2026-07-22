@@ -330,38 +330,6 @@ export default function DashboardPage() {
               </Card>
             </>
           )}
-          <Card title="Recent payments">
-            {recent.length === 0 ? (
-              <EmptyState>No payments yet.</EmptyState>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-border bg-surface-2 text-xs text-muted">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">Date</th>
-                      <th className="px-3 py-2 font-medium">Property info</th>
-                      <th className="px-3 py-2 font-medium">Tenant name</th>
-                      <th className="px-3 py-2 font-medium">Method</th>
-                      <th className="px-3 py-2 text-right font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {recent.map((p) => (
-                      <tr key={p.id}>
-                        <td className="px-3 py-2 text-muted">{p.paid_on}</td>
-                        <td className="px-3 py-2 text-text">{p.property_address}</td>
-                        <td className="px-3 py-2 text-muted">{p.tenant_name}</td>
-                        <td className="px-3 py-2">
-                          <Badge tone="brand">{p.method.replace("_", " ")}</Badge>
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium text-text">${p.amount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
         </div>
         <Card
           title="My properties"
@@ -402,6 +370,39 @@ export default function DashboardPage() {
           )}
         </Card>
       </div>
+      {/* Full width under both columns, matching the reference layout. */}
+      <Card title="Recent payments" className="mt-5">
+        {recent.length === 0 ? (
+          <EmptyState>No payments yet.</EmptyState>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-border bg-surface-2 text-xs text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Date</th>
+                  <th className="px-3 py-2 font-medium">Property info</th>
+                  <th className="px-3 py-2 font-medium">Tenant name</th>
+                  <th className="px-3 py-2 font-medium">Method</th>
+                  <th className="px-3 py-2 text-right font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {recent.map((p) => (
+                  <tr key={p.id}>
+                    <td className="px-3 py-2 text-muted">{p.paid_on}</td>
+                    <td className="px-3 py-2 text-text">{p.property_address}</td>
+                    <td className="px-3 py-2 text-muted">{p.tenant_name}</td>
+                    <td className="px-3 py-2">
+                      <Badge tone="brand">{p.method.replace("_", " ")}</Badge>
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium text-text">${p.amount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </AppShell>
   );
 }
