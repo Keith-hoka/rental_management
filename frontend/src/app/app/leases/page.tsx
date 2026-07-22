@@ -1,71 +1,68 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAccessToken } from "@/lib/auth";
 import { listAllLeases, type LeaseState, type LeaseSummary } from "@/lib/leases";
+import { AppShell } from "@/components/app-shell";
+import { useShell } from "@/components/use-shell";
+import { Badge, DataList, DataRow, EmptyState, PageHeader, linkButton } from "@/components/ui";
 
-const STATE_STYLES: Record<LeaseState, string> = {
-  active: "bg-green-100 text-green-800",
-  upcoming: "bg-blue-100 text-blue-800",
-  ended: "bg-gray-100 text-gray-600",
+const STATE_TONES: Record<LeaseState, "success" | "brand" | "neutral"> = {
+  active: "success",
+  upcoming: "brand",
+  ended: "neutral",
 };
 
 export default function AllLeasesPage() {
-  const router = useRouter();
+  const { me, unread, logOut } = useShell();
   const [leases, setLeases] = useState<LeaseSummary[]>([]);
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.replace("/login");
-      return;
-    }
+    if (!me) return;
     let active = true;
     listAllLeases()
-      .then((l) => {
-        if (active) setLeases(l);
-      })
-      .catch(() => {
-        if (active) setLeases([]);
-      });
+      .then((l) => active && setLeases(l))
+      .catch(() => active && setLeases([]));
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [me]);
+
+  if (!me) return null;
 
   return (
-    <main className="mx-auto max-w-2xl p-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Leases</h1>
-        <Link href="/app/leases/new" className="rounded bg-blue-600 px-3 py-2 text-white">
-          New lease
-        </Link>
-      </div>
-      <ul className="space-y-2">
+    <AppShell me={me} unread={unread} onLogOut={logOut}>
+      <PageHeader
+        title="Leases"
+        actions={
+          <Link href="/app/leases/new" className={linkButton}>
+            New lease
+          </Link>
+        }
+      />
+      <DataList>
         {leases.map((lease) => (
-          <li key={lease.id} className="flex items-center justify-between rounded border p-3">
-            <span className="text-sm">
-              <Link href={`/app/leases/${lease.id}`} className="font-medium text-blue-600">
-                {lease.property_address}
-              </Link>
-              <span className="text-gray-600">
-                {" "}
-                · {lease.tenant_name} · {lease.start_date} to {lease.end_date}
+          <DataRow key={lease.id}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <Link href={`/app/leases/${lease.id}`} className="font-medium text-text">
+                  {lease.property_address}
+                </Link>
+                <span className="text-muted">
+                  {" "}
+                  · {lease.tenant_name} · {lease.start_date} to {lease.end_date}
+                </span>
               </span>
-            </span>
-            <span className={`rounded px-2 py-1 text-xs ${STATE_STYLES[lease.state]}`}>
-              {lease.state}
-            </span>
-          </li>
+              <Badge tone={STATE_TONES[lease.state]}>{lease.state}</Badge>
+            </div>
+          </DataRow>
         ))}
-        {leases.length === 0 && <li className="text-gray-500">No leases yet.</li>}
-      </ul>
-      <p className="mt-6">
-        <Link href="/app" className="text-blue-600">
-          Back to dashboard
-        </Link>
-      </p>
-    </main>
+        {leases.length === 0 && (
+          <DataRow>
+            <EmptyState>No leases yet.</EmptyState>
+          </DataRow>
+        )}
+      </DataList>
+    </AppShell>
   );
 }

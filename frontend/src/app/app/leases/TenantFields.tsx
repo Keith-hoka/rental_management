@@ -1,4 +1,5 @@
 import type { CoTenant } from "@/lib/leases";
+import { Button, Input } from "@/components/ui";
 
 type MainField = "tenant_name" | "tenant_email" | "tenant_phone";
 
@@ -25,72 +26,68 @@ export function TenantFields({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-semibold text-gray-700">Main tenant</p>
-      <input
+      <p className="text-sm font-semibold text-text">Main tenant</p>
+      <Input
         required
         placeholder="Tenant name"
         value={tenantName}
         onChange={(e) => onMain("tenant_name", e.target.value)}
-        className="w-full rounded border px-3 py-2"
       />
-      <input
+      <Input
         type="email"
         required
         placeholder="Tenant email"
         value={tenantEmail}
         onChange={(e) => onMain("tenant_email", e.target.value)}
-        className="w-full rounded border px-3 py-2"
       />
-      <input
+      <Input
         placeholder="Tenant phone (optional)"
         value={tenantPhone}
         onChange={(e) => onMain("tenant_phone", e.target.value)}
-        className="w-full rounded border px-3 py-2"
       />
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-gray-700">Co-tenants</p>
-        <button
+        <p className="text-sm font-semibold text-text">Co-tenants</p>
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => onCoTenants([...coTenants, { name: "", email: "", phone: "" }])}
-          className="rounded border px-2 py-1 text-sm text-blue-600 transition hover:bg-blue-50"
         >
           Add co-tenant
-        </button>
+        </Button>
       </div>
       {coTenants.map((c, i) => (
         <div key={i} className="flex gap-2">
-          <input
+          <Input
             required
             placeholder="Name"
             aria-label={`Co-tenant ${i + 1} name`}
             value={c.name}
             onChange={(e) => updateCo(i, "name", e.target.value)}
-            className="flex-1 rounded border px-2 py-2"
           />
-          <input
+          <Input
             type="email"
             required
             placeholder="Email"
             aria-label={`Co-tenant ${i + 1} email`}
             value={c.email}
             onChange={(e) => updateCo(i, "email", e.target.value)}
-            className="flex-1 rounded border px-2 py-2"
           />
-          <input
+          <Input
             placeholder="Phone"
             aria-label={`Co-tenant ${i + 1} phone`}
             value={c.phone}
             onChange={(e) => updateCo(i, "phone", e.target.value)}
-            className="flex-1 rounded border px-2 py-2"
           />
-          <button
+          <Button
             type="button"
+            variant="danger"
+            size="sm"
             aria-label={`Remove co-tenant ${i + 1}`}
             onClick={() => onCoTenants(coTenants.filter((_, idx) => idx !== i))}
-            className="rounded border border-red-500 px-2 text-sm text-red-600 transition hover:bg-red-50"
           >
             Remove
-          </button>
+          </Button>
         </div>
       ))}
     </div>
