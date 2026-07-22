@@ -22,6 +22,15 @@ class PaymentInfo(BaseModel):
     note: str | None
 
 
+class RecentPayment(BaseModel):
+    id: uuid.UUID
+    amount: Decimal
+    paid_on: date
+    method: PaymentMethod
+    property_address: str
+    tenant_name: str
+
+
 class BalanceInfo(BaseModel):
     outstanding: Decimal
     overdue_amount: Decimal

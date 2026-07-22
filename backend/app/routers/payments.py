@@ -6,12 +6,40 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.models import Membership, Payment
+from app.models import Lease, Membership, Payment, Property
 from app.routers.leases import get_owned_lease, manager
-from app.schemas.payment import BalanceInfo, PaymentCreate, PaymentInfo
+from app.schemas.payment import BalanceInfo, PaymentCreate, PaymentInfo, RecentPayment
 from app.services.payments import lease_balance
 
 router = APIRouter(prefix="/api/v1", tags=["payments"])
+
+
+@router.get("/payments/recent", response_model=list[RecentPayment])
+async def recent_payments(
+    limit: int = 10,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[RecentPayment]:
+    """The organization's most recent payments, newest first."""
+    result = await session.execute(
+        select(Payment, Property.address, Lease.tenant_name)
+        .join(Lease, Lease.id == Payment.lease_id)
+        .join(Property, Property.id == Lease.property_id)
+        .where(Payment.organization_id == membership.organization_id)
+        .order_by(Payment.paid_on.desc(), Payment.created_at.desc())
+        .limit(limit)
+    )
+    return [
+        RecentPayment(
+            id=payment.id,
+            amount=payment.amount,
+            paid_on=payment.paid_on,
+            method=payment.method,
+            property_address=address,
+            tenant_name=tenant_name,
+        )
+        for payment, address, tenant_name in result.all()
+    ]
 
 
 @router.post("/leases/{lease_id}/payments", status_code=201, response_model=PaymentInfo)

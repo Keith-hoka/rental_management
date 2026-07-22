@@ -19,7 +19,9 @@ import {
 } from "@/lib/maintenance";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppShell } from "@/components/app-shell";
-import { Card, PageHeader, StatCard } from "@/components/ui";
+import { Badge, Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
+import { listProperties, type Property } from "@/lib/properties";
+import { listRecentPayments, type RecentPayment } from "@/lib/payments";
 
 interface Me {
   email: string;
@@ -38,6 +40,8 @@ export default function DashboardPage() {
   const [issueDesc, setIssueDesc] = useState("");
   const [issuePriority, setIssuePriority] = useState<MaintenancePriority>("medium");
   const [unread, setUnread] = useState(0);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [recent, setRecent] = useState<RecentPayment[]>([]);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -79,6 +83,14 @@ export default function DashboardPage() {
             if (active) setMaintByLease(Object.fromEntries(maint));
           });
         }
+        // Each manager panel catches its own failure so one bad response
+        // cannot take down the whole dashboard.
+        listProperties()
+          .then((p) => active && setProperties(p))
+          .catch(() => active && setProperties([]));
+        listRecentPayments()
+          .then((r) => active && setRecent(r))
+          .catch(() => active && setRecent([]));
         return getDashboardStats()
           .then((s) => {
             if (active) setStats(s);
@@ -277,38 +289,119 @@ export default function DashboardPage() {
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
       <PageHeader title="Dashboard" />
-      {stats && (
-        <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <StatCard label="Outstanding" value={`$${stats.outstanding}`} />
-            <StatCard label="Overdue" value={`$${stats.overdue}`} tone="danger" />
-            <StatCard label="Collected this month" value={`$${stats.collected_this_month}`} />
-            <StatCard
-              label="Properties"
-              value={`${stats.properties_occupied} of ${stats.properties_total} occupied`}
-            />
-            <StatCard label="Active leases" value={String(stats.active_leases)} />
-            <StatCard label="Tenants" value={String(stats.tenants)} />
-          </div>
-          <Card title="Monthly income" className="mt-5">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={stats.monthly_income}>
-                <XAxis dataKey="month" stroke="var(--ink-muted)" fontSize={12} />
-                <YAxis stroke="var(--ink-muted)" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--surface)",
-                    border: "1px solid var(--line)",
-                    borderRadius: 12,
-                    color: "var(--ink)",
-                  }}
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
+          {stats && (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <StatCard label="Outstanding" value={`$${stats.outstanding}`} />
+                <StatCard label="Overdue" value={`$${stats.overdue}`} tone="danger" />
+                <StatCard label="Collected this month" value={`$${stats.collected_this_month}`} />
+                <StatCard
+                  label="Properties"
+                  value={`${stats.properties_occupied} of ${stats.properties_total} occupied`}
                 />
-                <Bar dataKey="amount" fill="var(--brand)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+                <StatCard label="Active leases" value={String(stats.active_leases)} />
+                <StatCard label="Tenants" value={String(stats.tenants)} />
+              </div>
+              <Card title="Monthly income">
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={stats.monthly_income}>
+                    <XAxis dataKey="month" stroke="var(--ink-muted)" fontSize={12} />
+                    <YAxis stroke="var(--ink-muted)" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--surface)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 12,
+                        color: "var(--ink)",
+                      }}
+                    />
+                    {/* isAnimationActive off: with React StrictMode the entry
+                        animation can leave the bars stranded at zero height. */}
+                    <Bar
+                      dataKey="amount"
+                      fill="var(--brand)"
+                      radius={[6, 6, 0, 0]}
+                      isAnimationActive={false}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </>
+          )}
+          <Card title="Recent payments">
+            {recent.length === 0 ? (
+              <EmptyState>No payments yet.</EmptyState>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-muted">
+                    <tr>
+                      <th className="pb-2 font-medium">Date</th>
+                      <th className="pb-2 font-medium">Property</th>
+                      <th className="pb-2 font-medium">Tenant</th>
+                      <th className="pb-2 font-medium">Method</th>
+                      <th className="pb-2 text-right font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {recent.map((p) => (
+                      <tr key={p.id}>
+                        <td className="py-2 text-muted">{p.paid_on}</td>
+                        <td className="py-2 text-text">{p.property_address}</td>
+                        <td className="py-2 text-muted">{p.tenant_name}</td>
+                        <td className="py-2">
+                          <Badge tone="brand">{p.method.replace("_", " ")}</Badge>
+                        </td>
+                        <td className="py-2 text-right font-medium text-text">${p.amount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
-        </>
-      )}
+        </div>
+        <Card
+          title="My properties"
+          actions={
+            <Link href="/app/properties" className="text-sm text-brand">
+              View all
+            </Link>
+          }
+        >
+          {properties.length === 0 ? (
+            <EmptyState>No properties yet.</EmptyState>
+          ) : (
+            <ul className="space-y-2">
+              {properties.slice(0, 6).map((p) => (
+                <li key={p.id} className="flex items-center gap-3 rounded-lg border border-border p-2">
+                  {p.image_urls[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`${API_BASE_URL}${p.image_urls[0]}`}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <span className="h-12 w-12 shrink-0 rounded-lg bg-surface-2" />
+                  )}
+                  <span className="min-w-0">
+                    <Link
+                      href={`/app/properties/${p.id}`}
+                      className="block truncate font-medium text-text"
+                    >
+                      {p.address}
+                    </Link>
+                    <Badge tone={p.status === "occupied" ? "success" : "warning"}>{p.status}</Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
     </AppShell>
   );
 }

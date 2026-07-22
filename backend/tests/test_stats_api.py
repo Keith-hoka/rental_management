@@ -11,6 +11,13 @@ async def test_stats_endpoint(client):
     assert len(body["monthly_income"]) == 6
 
 
+async def test_monthly_income_amount_is_a_json_number(client):
+    """Recharts cannot plot strings, so the chart series must not be Decimal-as-string."""
+    headers = await landlord_headers(client, "statsnum@example.com")
+    body = (await client.get("/api/v1/stats", headers=headers)).json()
+    assert isinstance(body["monthly_income"][0]["amount"], (int, float))
+
+
 async def test_stats_requires_auth(client):
     response = await client.get("/api/v1/stats")
     assert response.status_code == 401

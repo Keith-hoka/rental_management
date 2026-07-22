@@ -64,7 +64,7 @@ export function AppShell({
     <div className="flex min-h-screen flex-col md:flex-row">
       <nav
         aria-label="Main"
-        className="shrink-0 border-b border-border bg-surface p-3 md:w-60 md:border-r md:border-b-0"
+        className="flex shrink-0 flex-col border-b border-border bg-surface p-3 md:w-60 md:border-r md:border-b-0"
       >
         <div className="mb-4 flex items-center gap-2 px-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-semibold text-white">
@@ -72,8 +72,8 @@ export function AppShell({
           </span>
           <span className="font-semibold text-text">Rentals</span>
         </div>
-        <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted uppercase">Manage</p>
-        <div className="mb-4 space-y-1">
+        <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted uppercase">Main menu</p>
+        <div className="space-y-1">
           {MANAGE.map((item) => (
             <NavLink
               key={item.href}
@@ -83,8 +83,11 @@ export function AppShell({
             />
           ))}
         </div>
-        <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted uppercase">Settings</p>
-        <div className="space-y-1">
+        {/* mt-auto pins settings to the bottom of the sidebar on desktop. */}
+        <div className="mt-6 space-y-1 md:mt-auto md:pt-6">
+          <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted uppercase">
+            Settings
+          </p>
           {SETTINGS.map((item) => (
             <NavLink key={item.href} {...item} active={isActive(item.href)} />
           ))}

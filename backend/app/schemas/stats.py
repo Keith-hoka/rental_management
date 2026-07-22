@@ -5,7 +5,10 @@ from pydantic import BaseModel
 
 class MonthlyIncome(BaseModel):
     month: str
-    amount: Decimal
+    # A float, not Decimal: Pydantic renders Decimal as a JSON string and the
+    # chart cannot plot strings. The money totals above stay Decimal - they are
+    # only ever displayed as text.
+    amount: float
 
 
 class DashboardStats(BaseModel):
