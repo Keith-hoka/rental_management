@@ -356,6 +356,10 @@ export default function DashboardPage() {
           )}
         </div>
         <Card
+          // min-w-0: as a grid item it otherwise cannot shrink below the
+          // min-content of the longest address, which widens the whole grid past
+          // the page padding and leaves the cards below it visibly narrower.
+          className="min-w-0"
           title="My properties"
           actions={
             <Link href="/app/properties" className="text-sm text-brand-fg">
