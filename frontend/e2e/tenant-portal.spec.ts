@@ -85,4 +85,13 @@ test("a tenant accepts an invite and uses the portal", async ({ page }) => {
   await nav.getByRole("link", { name: "Change password" }).click();
   await expect(page).toHaveURL(/\/app\/change-password$/);
   await expect(page.getByRole("button", { name: "Update password" })).toBeVisible();
+
+  // Narrow: the portal nav collapses the same way the manager sidebar does.
+  // Resizing here reuses this tenant rather than onboarding a second one.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menu = page.getByRole("button", { name: "Menu" });
+  await expect(menu).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Profile" })).toBeHidden();
+  await menu.click();
+  await expect(nav.getByRole("link", { name: "Profile" })).toBeVisible();
 });

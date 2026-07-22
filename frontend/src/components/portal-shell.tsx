@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ThemeToggle } from "@/components/ui";
 
 const LINKS = [
@@ -56,24 +56,34 @@ export function PortalShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
   const isActive = (href: string) =>
     href === "/app" ? pathname === "/app" : pathname.startsWith(href);
 
   return (
     <div className="min-h-screen bg-canvas">
+      {/* h-14 here and top-14 on the drawer are the same 3.5rem, as in AppShell:
+          the fixed drawer has to be told where the bar ends. */}
       <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+        <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4 md:px-6">
           {/* Same testid and shape as AppShell: auth.spec asserts this element
               contains both the name and the role. */}
-          <div data-testid="welcome" className="flex items-center gap-2 text-sm">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-on-soft">
+          <div data-testid="welcome" className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-on-soft">
               {me.name.slice(0, 1).toUpperCase()}
             </span>
-            <span className="text-text">
+            <span className="truncate text-text">
               {me.name} ({me.role})
             </span>
           </div>
-          <nav aria-label="Main" className="flex flex-wrap items-center gap-1">
+          {/* Below md this is a fixed drawer that covers the page; from md it is
+              the inline row it has always been. One <nav> either way, so the
+              links never get a duplicate match under strict mode. */}
+          <nav
+            aria-label="Main"
+            onClick={() => setOpen(false)}
+            className={`${open ? "flex" : "hidden"} fixed inset-x-0 top-14 bottom-0 z-30 flex-col gap-1 overflow-y-auto border-border bg-surface p-3 shadow-lg md:static md:ml-auto md:flex md:flex-row md:items-center md:overflow-visible md:bg-transparent md:p-0 md:shadow-none`}
+          >
             {LINKS.map((item) => (
               <NavLink
                 key={item.href}
@@ -82,12 +92,31 @@ export function PortalShell({
                 badge={item.label === "Messages" ? unread : undefined}
               />
             ))}
-            <button onClick={onLogOut} className={QUIET}>
+            <button onClick={onLogOut} className={`${QUIET} text-left`}>
               Log out
             </button>
-            {/* Same top-right corner as the manager header. */}
-            <ThemeToggle className="ml-1" />
           </nav>
+          <button
+            type="button"
+            aria-label="Menu"
+            aria-expanded={open}
+            onClick={() => setOpen((wasOpen) => !wasOpen)}
+            className="ml-auto shrink-0 rounded-lg border border-strong p-1.5 text-text hover:bg-surface-2 md:hidden"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
+          {/* Outside the nav so it stays reachable while the drawer is shut. */}
+          <ThemeToggle className="shrink-0 md:ml-1" />
         </div>
       </header>
       <main className="mx-auto max-w-3xl p-6">{children}</main>
