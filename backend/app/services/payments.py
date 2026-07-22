@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -83,3 +84,32 @@ async def lease_balance(session: AsyncSession, lease_id, today: date) -> Balance
     charges = await _charges(session, lease_id)
     total = await _total_paid(session, lease_id)
     return summarize(allocate(charges, total, today), total, today)
+
+
+async def org_charge_statuses(
+    session: AsyncSession, organization_id, today: date
+) -> dict[uuid.UUID, list[ChargeStatus]]:
+    """Allocate payments across charges for every lease in the organization.
+
+    Two queries regardless of lease count. The per-lease helpers issue two each,
+    so looping them over an organization costs 2N.
+    """
+    charges = (
+        (await session.execute(select(Charge).where(Charge.organization_id == organization_id)))
+        .scalars()
+        .all()
+    )
+    paid_rows = await session.execute(
+        select(Payment.lease_id, func.coalesce(func.sum(Payment.amount), 0))
+        .where(Payment.organization_id == organization_id)
+        .group_by(Payment.lease_id)
+    )
+    paid = {lease_id: Decimal(total) for lease_id, total in paid_rows.all()}
+
+    by_lease: dict[uuid.UUID, list[Charge]] = {}
+    for charge in charges:
+        by_lease.setdefault(charge.lease_id, []).append(charge)
+    return {
+        lease_id: allocate(rows, paid.get(lease_id, Decimal("0")), today)
+        for lease_id, rows in by_lease.items()
+    }
