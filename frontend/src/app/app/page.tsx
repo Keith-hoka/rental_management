@@ -8,6 +8,7 @@ import { clearTokens, getAccessToken } from "@/lib/auth";
 import { listMyLeases, type TenantLease } from "@/lib/tenants";
 import { listMyLeaseCharges, type ChargeInfo } from "@/lib/charges";
 import { getDashboardStats, type DashboardStats } from "@/lib/stats";
+import { getUnreadCount } from "@/lib/notifications";
 import {
   createMaintenance,
   listLeaseMaintenance,
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   const [issueTitle, setIssueTitle] = useState("");
   const [issueDesc, setIssueDesc] = useState("");
   const [issuePriority, setIssuePriority] = useState<MaintenancePriority>("medium");
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -54,6 +56,14 @@ export default function DashboardPage() {
       .then((m) => {
         if (!active) return;
         setMe(m);
+        // Its own catch: a failed count must never trigger the auth logout below.
+        getUnreadCount()
+          .then((u) => {
+            if (active) setUnread(u.count);
+          })
+          .catch(() => {
+            if (active) setUnread(0);
+          });
         if (m.role === "tenant") {
           return listMyLeases().then(async (l) => {
             if (!active) return;
@@ -254,6 +264,9 @@ export default function DashboardPage() {
           {myLeases.length === 0 && <li className="text-gray-500">No lease yet.</li>}
         </ul>
         <div className="mt-6 flex gap-3">
+          <Link href="/app/messages" className="rounded border px-3 py-1 text-blue-600">
+            Messages{unread > 0 ? ` (${unread})` : ""}
+          </Link>
           <Link href="/app/profile" className="rounded border px-3 py-1 text-blue-600">
             Contact info
           </Link>
@@ -312,6 +325,9 @@ export default function DashboardPage() {
         </Link>
         <Link href="/app/team" className="rounded border px-3 py-1 text-blue-600">
           Team
+        </Link>
+        <Link href="/app/messages" className="rounded border px-3 py-1 text-blue-600">
+          Messages{unread > 0 ? ` (${unread})` : ""}
         </Link>
         <Link href="/app/change-password" className="rounded border px-3 py-1 text-blue-600">
           Change password
