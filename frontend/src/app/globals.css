@@ -9,6 +9,9 @@
   --surface: #ffffff;
   --surface-2: #f1f2f7;
   --line: #e6e8f0;
+  /* Outline controls only. --line is a divider at ~1.2:1 against its own
+     surface, well under the 3:1 WCAG asks of a control's boundary. */
+  --line-strong: #7d859f;
   --ink: #12141c;
   --ink-muted: #6b7280;
   --brand: #4f46e5;
@@ -33,6 +36,7 @@
   --surface: #171a23;
   --surface-2: #1f2330;
   --line: #262a36;
+  --line-strong: #626c8a;
   --ink: #e8eaf0;
   --ink-muted: #9ba1b0;
   /* Same indigo as light: white on it is 6.29:1, where the lighter #6366f1
@@ -62,6 +66,7 @@
     --surface: #171a23;
     --surface-2: #1f2330;
     --line: #262a36;
+    --line-strong: #626c8a;
     --ink: #e8eaf0;
     --ink-muted: #9ba1b0;
     --brand: #4f46e5;
@@ -87,6 +92,7 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--line);
+  --color-strong: var(--line-strong);
   --color-text: var(--ink);
   --color-muted: var(--ink-muted);
   --color-brand: var(--brand);

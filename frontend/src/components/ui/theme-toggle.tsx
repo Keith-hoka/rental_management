@@ -63,7 +63,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       onClick={() => choose(next)}
       aria-label={`Switch to ${next} mode`}
       title={`Switch to ${next} mode`}
-      className={`flex h-8 w-8 items-center justify-center rounded-full border border-border text-text hover:bg-surface-2 ${className}`}
+      className={`flex h-8 w-8 items-center justify-center rounded-full border border-strong text-text hover:bg-surface-2 ${className}`}
     >
       <svg
         viewBox="0 0 24 24"

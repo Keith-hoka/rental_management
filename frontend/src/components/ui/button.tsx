@@ -4,10 +4,12 @@ type Variant = "primary" | "secondary" | "ghost" | "outline" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
   primary: "bg-brand text-white hover:bg-brand-hover",
-  secondary: "border border-border bg-surface text-text hover:bg-surface-2",
+  // border-strong, not border-border: these have no fill, so the border is the
+  // only thing marking the control, and the divider token is too faint for that.
+  secondary: "border border-strong bg-surface text-text hover:bg-surface-2",
   ghost: "text-brand-fg hover:bg-brand-soft",
-  outline: "border border-border text-brand-fg hover:bg-brand-soft",
-  danger: "border border-border bg-surface text-danger hover:bg-danger-soft",
+  outline: "border border-strong text-brand-fg hover:bg-brand-soft",
+  danger: "border border-strong bg-surface text-danger hover:bg-danger-soft",
 };
 
 // whitespace-nowrap + shrink-0: as a flex item a button is shrinkable by

@@ -33,7 +33,7 @@ export default function Home() {
             </Link>
             <Link
               href="/signup"
-              className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-text hover:bg-surface-2"
+              className="rounded-lg border border-strong px-5 py-2.5 text-sm font-medium text-text hover:bg-surface-2"
             >
               Create an account
             </Link>
