@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.routers.properties import get_owned_property
 from app.schemas.charge import ChargeInfo
+from app.services.invites import reject_duplicate_invite
 from app.services.payments import lease_statuses
 from app.schemas.invitation import InvitationResponse
 from app.schemas.lease import LeaseCreate, LeaseResponse, LeaseSummary, LeaseUpdate
@@ -214,6 +215,7 @@ async def invite_tenant(
     ).first()
     if already is not None:
         raise HTTPException(status_code=409, detail="Already a tenant of this lease")
+    await reject_duplicate_invite(session, body.email, lease.organization_id, lease.id)
 
     invite = Invitation(
         organization_id=lease.organization_id,

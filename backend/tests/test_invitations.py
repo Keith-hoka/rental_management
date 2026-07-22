@@ -91,3 +91,32 @@ async def test_revoke_invitation_in_other_org_is_404(client):
 
     response = await client.delete(f"/api/v1/invitations/{created['id']}", headers=org_b)
     assert response.status_code == 404
+
+
+async def test_duplicate_pending_invitation_is_rejected(client):
+    headers = await landlord_headers(client, "dup@example.com")
+    body = {"email": "pm@example.com", "role": "property_manager"}
+    assert (await client.post("/api/v1/invitations", json=body, headers=headers)).status_code == 201
+
+    second = await client.post("/api/v1/invitations", json=body, headers=headers)
+    assert second.status_code == 409
+    listed = (await client.get("/api/v1/invitations", headers=headers)).json()
+    assert len(listed) == 1
+
+
+async def test_invitation_can_be_reissued_after_revoke(client):
+    headers = await landlord_headers(client, "reissue@example.com")
+    body = {"email": "pm@example.com", "role": "property_manager"}
+    first = (await client.post("/api/v1/invitations", json=body, headers=headers)).json()
+    await client.delete(f"/api/v1/invitations/{first['id']}", headers=headers)
+
+    again = await client.post("/api/v1/invitations", json=body, headers=headers)
+    assert again.status_code == 201
+
+
+async def test_same_email_can_be_invited_by_another_org(client):
+    a = await landlord_headers(client, "org-a@example.com")
+    b = await landlord_headers(client, "org-b@example.com")
+    body = {"email": "pm@example.com", "role": "property_manager"}
+    assert (await client.post("/api/v1/invitations", json=body, headers=a)).status_code == 201
+    assert (await client.post("/api/v1/invitations", json=body, headers=b)).status_code == 201

@@ -181,3 +181,27 @@ async def test_revoke_lease_invitation_removes_it(client):
     assert revoked.status_code == 204
     after = (await client.get(f"/api/v1/leases/{lease_id}/invitations", headers=headers)).json()
     assert after == []
+
+
+async def test_duplicate_pending_tenant_invitation_is_rejected(client):
+    headers = await landlord_headers(client, "dup-tenant@example.com")
+    lease_id = await make_lease(client, headers, "2 Dup St")
+    body = {"email": "tenant@example.com"}
+    first = await client.post(f"/api/v1/leases/{lease_id}/invite", json=body, headers=headers)
+    assert first.status_code == 201
+
+    second = await client.post(f"/api/v1/leases/{lease_id}/invite", json=body, headers=headers)
+    assert second.status_code == 409
+
+
+async def test_same_tenant_can_be_invited_to_another_lease(client):
+    headers = await landlord_headers(client, "two-lease@example.com")
+    body = {"email": "tenant@example.com"}
+    one = await make_lease(client, headers, "3 First St")
+    two = await make_lease(client, headers, "4 Second St")
+    assert (
+        await client.post(f"/api/v1/leases/{one}/invite", json=body, headers=headers)
+    ).status_code == 201
+    assert (
+        await client.post(f"/api/v1/leases/{two}/invite", json=body, headers=headers)
+    ).status_code == 201

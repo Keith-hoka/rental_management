@@ -14,6 +14,7 @@ from app.core.email import send_email
 from app.core.security import hash_password
 from app.models import Invitation, InvitationStatus, LeaseTenant, Membership, Role, User
 from app.routers.auth import issue_tokens
+from app.services.invites import reject_duplicate_invite
 from app.schemas.auth import TokenPair
 from app.schemas.invitation import (
     AcceptInvitationRequest,
@@ -35,6 +36,7 @@ async def create_invitation(
     session: AsyncSession = Depends(get_session),
 ) -> Invitation:
     """Invite a team member (property_manager) to the caller's organization."""
+    await reject_duplicate_invite(session, body.email, membership.organization_id)
     invite = Invitation(
         organization_id=membership.organization_id,
         email=body.email,
