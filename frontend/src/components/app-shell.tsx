@@ -100,11 +100,11 @@ export function AppShell({
           >
             Log out
           </button>
-          <ThemeToggle className="w-full text-left" />
         </div>
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end border-b border-border bg-surface px-6 py-3">
+        <header className="flex items-center justify-end gap-3 border-b border-border bg-surface px-6 py-3">
+          <ThemeToggle />
           {/* Keeps data-testid="welcome" with both name and role: auth.spec
               asserts the element contains "E2E User (landlord)". */}
           <div data-testid="welcome" className="flex items-center gap-2 text-sm">

@@ -85,7 +85,8 @@ export function PortalShell({
             <button onClick={onLogOut} className={QUIET}>
               Log out
             </button>
-            <ThemeToggle />
+            {/* Same top-right corner as the manager header. */}
+            <ThemeToggle className="ml-1" />
           </nav>
         </div>
       </header>
