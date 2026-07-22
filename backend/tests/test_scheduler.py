@@ -2,7 +2,7 @@ from app.core.config import settings
 from app.core.scheduler import scheduler, start_scheduler
 
 
-async def test_start_scheduler_registers_both_daily_jobs():
+async def test_start_scheduler_registers_all_daily_jobs():
     try:
         start_scheduler()
 
@@ -13,5 +13,9 @@ async def test_start_scheduler_registers_both_daily_jobs():
         charges = scheduler.get_job("generate_charges")
         assert charges is not None
         assert f"hour='{settings.charge_generation_hour}'" in str(charges.trigger)
+
+        rent = scheduler.get_job("rent_reminders")
+        assert rent is not None
+        assert f"hour='{settings.rent_reminder_hour}'" in str(rent.trigger)
     finally:
         scheduler.shutdown(wait=False)

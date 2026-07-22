@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     charge_lead_days: int = 7
     charge_generation_hour: int = 6
 
+    # Rent reminders: daily job run hour (lead and overdue thresholds live in the service).
+    rent_reminder_hour: int = 9
+
     # Directory where uploaded property images are stored (served at /uploads).
     upload_dir: str = "uploads"
 

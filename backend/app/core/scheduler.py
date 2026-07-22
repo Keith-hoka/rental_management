@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.db import SessionLocal
 from app.services.charges import generate_charges
 from app.services.reminders import run_expiry_reminders
+from app.services.rent_reminders import run_rent_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,13 @@ async def _charges_job() -> None:
     logger.info("rent charges: generated %s", count)
 
 
+async def _rent_job() -> None:
+    """Open a session and send rent due-soon and overdue reminders for today."""
+    async with SessionLocal() as session:
+        count = await run_rent_reminders(session, datetime.now(UTC).date())
+    logger.info("rent reminders: sent %s", count)
+
+
 def start_scheduler() -> None:
     """Register the daily reminder and charge-generation jobs and start the scheduler."""
     scheduler.add_job(
@@ -40,6 +48,12 @@ def start_scheduler() -> None:
         _charges_job,
         CronTrigger(hour=settings.charge_generation_hour),
         id="generate_charges",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _rent_job,
+        CronTrigger(hour=settings.rent_reminder_hour),
+        id="rent_reminders",
         replace_existing=True,
     )
     scheduler.start()
