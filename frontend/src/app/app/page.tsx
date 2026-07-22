@@ -307,6 +307,9 @@ export default function DashboardPage() {
         <Link href="/app/leases" className="rounded border px-3 py-1 text-blue-600">
           Leases
         </Link>
+        <Link href="/app/maintenance" className="rounded border px-3 py-1 text-blue-600">
+          Maintenance
+        </Link>
         <Link href="/app/team" className="rounded border px-3 py-1 text-blue-600">
           Team
         </Link>
