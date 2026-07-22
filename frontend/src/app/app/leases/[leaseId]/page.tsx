@@ -399,7 +399,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             <Field label="Start" value={lease.start_date} />
             <Field label="End" value={lease.end_date} />
           </dl>
-          <Button variant="secondary" className="w-full" onClick={() => startEdit(lease)}>
+          <Button className="w-full" onClick={() => startEdit(lease)}>
             Edit
           </Button>
           <Button variant="danger" className="mt-2 w-full" onClick={() => setConfirming(true)}>
@@ -566,9 +566,23 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       )}
 
       <p className="mt-6">
-        <Link href="/app/leases" className="text-brand">
-          Back
-        </Link>
+        {/* While editing, back means "leave the form", not "leave the lease". */}
+        {editing ? (
+          <button
+            type="button"
+            className="text-brand"
+            onClick={() => {
+              setEditing(false);
+              setForm(null);
+            }}
+          >
+            Back
+          </button>
+        ) : (
+          <Link href="/app/leases" className="text-brand">
+            Back
+          </Link>
+        )}
       </p>
 
       {confirming && (
