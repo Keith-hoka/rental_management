@@ -19,6 +19,7 @@ import {
 } from "@/lib/maintenance";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppShell } from "@/components/app-shell";
+import { PaymentTable } from "@/components/payment-table";
 import { Badge, Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import { listProperties, type Property } from "@/lib/properties";
 import { listRecentPayments, type RecentPayment } from "@/lib/payments";
@@ -372,36 +373,7 @@ export default function DashboardPage() {
       </div>
       {/* Full width under both columns, matching the reference layout. */}
       <Card title="Recent payments" className="mt-5">
-        {recent.length === 0 ? (
-          <EmptyState>No payments yet.</EmptyState>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-surface-2 text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Date</th>
-                  <th className="px-3 py-2 font-medium">Property info</th>
-                  <th className="px-3 py-2 font-medium">Tenant name</th>
-                  <th className="px-3 py-2 font-medium">Method</th>
-                  <th className="px-3 py-2 text-right font-medium">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {recent.map((p) => (
-                  <tr key={p.id}>
-                    <td className="px-3 py-2 text-muted">{p.paid_on}</td>
-                    <td className="px-3 py-2 text-text">{p.property_address}</td>
-                    <td className="px-3 py-2 text-muted">{p.tenant_name}</td>
-                    <td className="px-3 py-2">
-                      <Badge tone="brand">{p.method.replace("_", " ")}</Badge>
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium text-text">${p.amount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <PaymentTable payments={recent} />
       </Card>
     </AppShell>
   );
