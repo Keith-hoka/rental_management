@@ -11,6 +11,7 @@ backend/uploads/
 node_modules/
 .next/
 frontend/test-results/
+test-results/
 frontend/playwright-report/
 
 # OS / editor
