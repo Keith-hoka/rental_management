@@ -13,3 +13,4 @@ export { Badge } from "./badge";
 export { PageHeader } from "./page-header";
 export { EmptyState } from "./empty-state";
 export { DataList, DataRow } from "./data-list";
+export { ThemeToggle } from "./theme-toggle";

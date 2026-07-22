@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { ThemeToggle } from "@/components/ui";
 
 const LINKS = [
   { href: "/app", label: "Dashboard" },
@@ -84,6 +85,7 @@ export function PortalShell({
             <button onClick={onLogOut} className={QUIET}>
               Log out
             </button>
+            <ThemeToggle />
           </nav>
         </div>
       </header>

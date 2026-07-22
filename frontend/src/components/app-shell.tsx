@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { ThemeToggle } from "@/components/ui";
 
 const MANAGE = [
   { href: "/app", label: "Dashboard" },
@@ -99,6 +100,7 @@ export function AppShell({
           >
             Log out
           </button>
+          <ThemeToggle className="w-full text-left" />
         </div>
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">

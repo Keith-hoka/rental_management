@@ -39,7 +39,7 @@ import {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between border-b py-2">
+    <div className="flex justify-between border-b border-border py-2">
       <dt className="text-muted">{label}</dt>
       <dd className="font-medium text-text">{value}</dd>
     </div>
@@ -48,14 +48,14 @@ function Field({ label, value }: { label: string; value: string }) {
 
 function ChargeBadge({ status, overdue }: { status: string; overdue: boolean }) {
   const label = overdue ? "Overdue" : status.charAt(0).toUpperCase() + status.slice(1);
-  const color = overdue
-    ? "bg-red-100 text-red-800"
+  const tone = overdue
+    ? "danger"
     : status === "paid"
-      ? "bg-green-100 text-success"
+      ? "success"
       : status === "partial"
-        ? "bg-yellow-100 text-yellow-800"
-        : "bg-gray-100 text-text";
-  return <span className={`rounded px-2 py-0.5 text-xs ${color}`}>{label}</span>;
+        ? "warning"
+        : "neutral";
+  return <Badge tone={tone}>{label}</Badge>;
 }
 
 export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId: string }> }) {
@@ -372,11 +372,11 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             <Field label="Email" value={lease.tenant_email} />
             <Field label="Phone" value={lease.tenant_phone || "—"} />
             {lease.co_tenants.length > 0 && (
-              <div className="border-b py-2">
+              <div className="border-b border-border py-2">
                 <p className="mb-2 text-muted">Co-tenants</p>
                 <ul className="space-y-2">
                   {lease.co_tenants.map((c, i) => (
-                    <li key={i} className="rounded bg-gray-50 p-2">
+                    <li key={i} className="rounded-lg bg-surface-2 p-2">
                       <p className="font-medium text-text">{c.name}</p>
                       <p className="text-muted">{c.email}</p>
                       {c.phone && <p className="text-muted">{c.phone}</p>}
