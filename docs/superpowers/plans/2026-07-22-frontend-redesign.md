@@ -75,114 +75,130 @@ tasks are markup substitution only — no behavior edits.
 - Produces: Tailwind utilities `bg-canvas`, `bg-surface`, `bg-surface-2`, `border-border`,
   `text-text`, `text-muted`, `bg-brand`, `text-brand`, `bg-brand-soft`, `text-brand-on-soft`, and
   the same `-soft` / `-on-soft` triples for `success`, `warning`, `danger`; plus the raw CSS vars
-  (e.g. `var(--color-brand)`) for SVG fills.
+  (`var(--brand)`, `var(--ink-muted)`, `var(--surface)`, `var(--line)`, `var(--ink)`) for SVG fills
+  and inline styles.
 
 - [ ] **Step 1: Replace globals.css**
+
+**Naming matters here.** The raw variables and the Tailwind theme names must differ. Writing
+`@theme inline { --color-canvas: var(--color-canvas) }` is self-referential and produces a broken
+value chain. So the raw tokens use short names (`--canvas`, `--surface`, `--line`, `--ink`,
+`--ink-muted`, `--brand`, ...) and `@theme inline` maps them to the `--color-*` names Tailwind needs.
+Verified against the built CSS: `.bg-canvas{background-color:var(--canvas)}`,
+`.border-border{border-color:var(--line)}`, `.text-text{color:var(--ink)}` — each utility resolves
+to a raw var that the dark block reassigns, which is what makes `dark:` variants unnecessary.
+
+**In JS/SVG, reference the raw names** (`var(--brand)`, `var(--ink-muted)`, `var(--surface)`,
+`var(--line)`, `var(--ink)`), not the `--color-*` aliases.
 
 Replace the whole of `frontend/src/app/globals.css`:
 
 ```css
 @import "tailwindcss";
 
+/*
+ * Raw tokens. Components never reference these directly and never write a
+ * dark: variant: dark mode reassigns the same names in one block below.
+ */
 :root {
-  --color-canvas: #f6f7fb;
-  --color-surface: #ffffff;
-  --color-surface-2: #f1f2f7;
-  --color-border: #e6e8f0;
-  --color-text: #12141c;
-  --color-muted: #6b7280;
-  --color-brand: #4f46e5;
-  --color-brand-hover: #4338ca;
-  --color-brand-soft: #eef2ff;
-  --color-brand-on-soft: #3730a3;
-  --color-success: #16a34a;
-  --color-success-soft: #dcfce7;
-  --color-success-on-soft: #14532d;
-  --color-warning: #d97706;
-  --color-warning-soft: #fef3c7;
-  --color-warning-on-soft: #78350f;
-  --color-danger: #dc2626;
-  --color-danger-soft: #fee2e2;
-  --color-danger-on-soft: #7f1d1d;
+  --canvas: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f1f2f7;
+  --line: #e6e8f0;
+  --ink: #12141c;
+  --ink-muted: #6b7280;
+  --brand: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-soft: #eef2ff;
+  --brand-on-soft: #3730a3;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --success-on-soft: #14532d;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --warning-on-soft: #78350f;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --danger-on-soft: #7f1d1d;
   --shadow-card: 0 1px 2px rgb(16 20 40 / 0.04), 0 4px 12px rgb(16 20 40 / 0.06);
 }
 
-/* Dark values for the same names: components never write a dark: variant. */
 :root[data-theme="dark"] {
-  --color-canvas: #0f1117;
-  --color-surface: #171a23;
-  --color-surface-2: #1f2330;
-  --color-border: #262a36;
-  --color-text: #e8eaf0;
-  --color-muted: #9ba1b0;
-  --color-brand: #6366f1;
-  --color-brand-hover: #818cf8;
-  --color-brand-soft: #242943;
-  --color-brand-on-soft: #c7d2fe;
-  --color-success: #4ade80;
-  --color-success-soft: #14532d;
-  --color-success-on-soft: #bbf7d0;
-  --color-warning: #fbbf24;
-  --color-warning-soft: #78350f;
-  --color-warning-on-soft: #fde68a;
-  --color-danger: #f87171;
-  --color-danger-soft: #7f1d1d;
-  --color-danger-on-soft: #fecaca;
+  --canvas: #0f1117;
+  --surface: #171a23;
+  --surface-2: #1f2330;
+  --line: #262a36;
+  --ink: #e8eaf0;
+  --ink-muted: #9ba1b0;
+  --brand: #6366f1;
+  --brand-hover: #818cf8;
+  --brand-soft: #242943;
+  --brand-on-soft: #c7d2fe;
+  --success: #4ade80;
+  --success-soft: #14532d;
+  --success-on-soft: #bbf7d0;
+  --warning: #fbbf24;
+  --warning-soft: #78350f;
+  --warning-on-soft: #fde68a;
+  --danger: #f87171;
+  --danger-soft: #7f1d1d;
+  --danger-on-soft: #fecaca;
   --shadow-card: none;
 }
 
+/* System preference applies until the user picks a theme explicitly. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-canvas: #0f1117;
-    --color-surface: #171a23;
-    --color-surface-2: #1f2330;
-    --color-border: #262a36;
-    --color-text: #e8eaf0;
-    --color-muted: #9ba1b0;
-    --color-brand: #6366f1;
-    --color-brand-hover: #818cf8;
-    --color-brand-soft: #242943;
-    --color-brand-on-soft: #c7d2fe;
-    --color-success: #4ade80;
-    --color-success-soft: #14532d;
-    --color-success-on-soft: #bbf7d0;
-    --color-warning: #fbbf24;
-    --color-warning-soft: #78350f;
-    --color-warning-on-soft: #fde68a;
-    --color-danger: #f87171;
-    --color-danger-soft: #7f1d1d;
-    --color-danger-on-soft: #fecaca;
+    --canvas: #0f1117;
+    --surface: #171a23;
+    --surface-2: #1f2330;
+    --line: #262a36;
+    --ink: #e8eaf0;
+    --ink-muted: #9ba1b0;
+    --brand: #6366f1;
+    --brand-hover: #818cf8;
+    --brand-soft: #242943;
+    --brand-on-soft: #c7d2fe;
+    --success: #4ade80;
+    --success-soft: #14532d;
+    --success-on-soft: #bbf7d0;
+    --warning: #fbbf24;
+    --warning-soft: #78350f;
+    --warning-on-soft: #fde68a;
+    --danger: #f87171;
+    --danger-soft: #7f1d1d;
+    --danger-on-soft: #fecaca;
     --shadow-card: none;
   }
 }
 
 @theme inline {
-  --color-canvas: var(--color-canvas);
-  --color-surface: var(--color-surface);
-  --color-surface-2: var(--color-surface-2);
-  --color-border: var(--color-border);
-  --color-text: var(--color-text);
-  --color-muted: var(--color-muted);
-  --color-brand: var(--color-brand);
-  --color-brand-hover: var(--color-brand-hover);
-  --color-brand-soft: var(--color-brand-soft);
-  --color-brand-on-soft: var(--color-brand-on-soft);
-  --color-success: var(--color-success);
-  --color-success-soft: var(--color-success-soft);
-  --color-success-on-soft: var(--color-success-on-soft);
-  --color-warning: var(--color-warning);
-  --color-warning-soft: var(--color-warning-soft);
-  --color-warning-on-soft: var(--color-warning-on-soft);
-  --color-danger: var(--color-danger);
-  --color-danger-soft: var(--color-danger-soft);
-  --color-danger-on-soft: var(--color-danger-on-soft);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--line);
+  --color-text: var(--ink);
+  --color-muted: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-on-soft: var(--brand-on-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-on-soft: var(--success-on-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-on-soft: var(--warning-on-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-on-soft: var(--danger-on-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--color-canvas);
-  color: var(--color-text);
+  background: var(--canvas);
+  color: var(--ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 ```
@@ -202,13 +218,16 @@ export const metadata: Metadata = {
 };
 ```
 
-and add the color-scheme meta inside the `<html>` element, before `<body>`:
+and add the viewport export beside it — Next's documented API for this, rather than a hand-written
+`<head>` (confirmed in `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/generate-viewport.md`):
 
 ```tsx
-      <head>
-        <meta name="color-scheme" content="light dark" />
-      </head>
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+};
 ```
+
+`Viewport` is imported from `next` alongside `Metadata`.
 
 - [ ] **Step 3: Verify**
 
@@ -622,17 +641,17 @@ In `frontend/src/app/app/page.tsx`:
           <Card title="Monthly income" className="mt-5">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={stats.monthly_income}>
-                <XAxis dataKey="month" stroke="var(--color-muted)" fontSize={12} />
-                <YAxis stroke="var(--color-muted)" fontSize={12} />
+                <XAxis dataKey="month" stroke="var(--ink-muted)" fontSize={12} />
+                <YAxis stroke="var(--ink-muted)" fontSize={12} />
                 <Tooltip
                   contentStyle={{
-                    background: "var(--color-surface)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
                     borderRadius: 12,
-                    color: "var(--color-text)",
+                    color: "var(--ink)",
                   }}
                 />
-                <Bar dataKey="amount" fill="var(--color-brand)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="amount" fill="var(--brand)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -643,7 +662,7 @@ In `frontend/src/app/app/page.tsx`:
 ```
 
 `Card title="Monthly income"` renders `<h2>Monthly income</h2>`, preserving the heading
-`dashboard-stats.spec.ts` asserts. `fill="var(--color-brand)"` makes the bars follow the theme —
+`dashboard-stats.spec.ts` asserts. `fill="var(--brand)"` makes the bars follow the theme —
 SVG `fill` resolves CSS custom properties, so no JS is needed.
 
 Leave the tenant branch untouched in this task; Task 8 converts it.
@@ -1210,7 +1229,7 @@ managers, a single-column portal for tenants, and dark mode across every page.
 - `PortalShell` owning its own `<main>` -> Task 8. ✓
 - Strict-mode collision on `/app/properties`, resolved by scoping to `getByRole("main")` with no
   user-visible rename -> Task 3, Step 3. ✓
-- Recharts `fill="var(--color-brand)"` -> Task 3, Step 2. ✓
+- Recharts `fill="var(--brand)"` -> Task 3, Step 2. ✓
 - Dark mode: `data-theme` override, guarded media query, no-flash script, toggle -> Tasks 1 and 9. ✓
 - Every page in the spec's page-treatment list has a task: marketing/auth -> 4, properties -> 5,
   leases -> 6, maintenance/messages/team -> 7, profile/change-password/tenant -> 8. ✓
