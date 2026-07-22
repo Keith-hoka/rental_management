@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
-import { Card, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Input, PageHeader, Select } from "@/components/ui";
 import {
   deleteLease,
   getLease,
@@ -264,6 +264,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       )}
 
       {editing && form ? (
+        <Card>
         <form onSubmit={onSave} className="mb-6 space-y-3">
           <TenantFields
             tenantName={form.tenant_name}
@@ -276,94 +277,95 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
           <div className="flex gap-2">
             <label className="flex-1 text-sm text-muted">
               Rent
-              <input
+              <Input
                 type="number"
                 min={0}
                 required
                 value={form.rent_amount || ""}
                 onChange={(e) => set("rent_amount", Number(e.target.value))}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1"
               />
             </label>
             <label className="flex-1 text-sm text-muted">
               Frequency
-              <select
+              <Select
                 value={form.rent_frequency}
                 onChange={(e) => set("rent_frequency", e.target.value as LeaseInput["rent_frequency"])}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1"
               >
                 <option value="weekly">Weekly</option>
                 <option value="fortnightly">Fortnightly</option>
                 <option value="monthly">Monthly</option>
-              </select>
+              </Select>
             </label>
           </div>
           <div className="flex gap-2">
             <label className="flex-1 text-sm text-muted">
               Bond (optional)
-              <input
+              <Input
                 type="number"
                 min={0}
                 value={form.bond_amount ?? ""}
                 onChange={(e) =>
                   set("bond_amount", e.target.value === "" ? null : Number(e.target.value))
                 }
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1"
               />
             </label>
             <label className="flex-1 text-sm text-muted">
               Notice period (days)
-              <input
+              <Input
                 type="number"
                 min={0}
                 value={form.notice_period_days ?? ""}
                 onChange={(e) =>
                   set("notice_period_days", e.target.value === "" ? null : Number(e.target.value))
                 }
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1"
               />
             </label>
           </div>
           <div className="flex gap-2">
             <label className="flex-1 text-sm text-muted">
               Start
-              <input
+              <Input
                 type="date"
                 required
                 value={form.start_date}
                 onChange={(e) => set("start_date", e.target.value)}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1"
               />
             </label>
             <label className="flex-1 text-sm text-muted">
               End
-              <input
+              <Input
                 type="date"
                 required
                 value={form.end_date}
                 onChange={(e) => set("end_date", e.target.value)}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1"
               />
             </label>
           </div>
-          <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-brand text-white">
-              Save lease
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(false);
-                setForm(null);
-              }}
-              className="flex-1 rounded border py-2 transition hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
+          <Button type="submit" className="w-full">
+            Save lease
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            onClick={() => {
+              setEditing(false);
+              setForm(null);
+            }}
+          >
+            Cancel
+          </Button>
         </form>
+        </Card>
       ) : (
         <>
+          <Card>
           <dl className="mb-6 text-sm">
             <Field label="Property" value={property?.address ?? "—"} />
             <Field label="Tenant" value={lease.tenant_name} />
@@ -397,20 +399,13 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             <Field label="Start" value={lease.start_date} />
             <Field label="End" value={lease.end_date} />
           </dl>
-          <div className="flex gap-2">
-            <button
-              onClick={() => startEdit(lease)}
-              className="flex-1 rounded border px-3 py-2 text-brand transition hover:bg-blue-50"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setConfirming(true)}
-              className="flex-1"
-            >
-              Delete
-            </button>
-          </div>
+          <Button variant="secondary" className="w-full" onClick={() => startEdit(lease)}>
+            Edit
+          </Button>
+          <Button variant="danger" className="mt-2 w-full" onClick={() => setConfirming(true)}>
+            Delete
+          </Button>
+          </Card>
 
           <Card className="mt-5" title="Tenants">
             {inviteStatus && <p className="mb-2 text-sm text-success">{inviteStatus}</p>}
@@ -435,26 +430,18 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                       {r.name} <span className="text-muted">({r.email})</span>
                     </span>
                     {isJoined ? (
-                      <span className="rounded bg-green-100 px-2 py-1 text-xs text-success">
-                        Joined
-                      </span>
+                      <Badge tone="success">Joined</Badge>
                     ) : invite ? (
                       <span className="flex items-center gap-2">
                         <span className="text-xs text-muted">Pending</span>
-                        <button
-                          onClick={() => onRevoke(invite.id)}
-                          
-                        >
+                        <Button variant="danger" size="sm" onClick={() => onRevoke(invite.id)}>
                           Revoke
-                        </button>
+                        </Button>
                       </span>
                     ) : (
-                      <button
-                        onClick={() => onInvite(r.email)}
-                        className="rounded border px-2 py-1 text-brand transition hover:bg-blue-50"
-                      >
+                      <Button variant="secondary" size="sm" onClick={() => onInvite(r.email)}>
                         Invite
-                      </button>
+                      </Button>
                     )}
                   </li>
                 );
@@ -515,7 +502,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
 
           <Card className="mt-5" title="Payments">
             <form onSubmit={onRecordPayment} className="mb-3 flex flex-wrap gap-2">
-              <input
+              <Input
                 type="number"
                 min="0.01"
                 step="0.01"
@@ -523,36 +510,34 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                 placeholder="Amount"
                 value={payAmount}
                 onChange={(e) => setPayAmount(e.target.value)}
-                className="w-28 rounded border px-2 py-1 text-sm"
+                className="w-28"
               />
-              <input
+              <Input
                 type="date"
                 required
                 aria-label="Payment date"
                 value={payDate}
                 onChange={(e) => setPayDate(e.target.value)}
-                className="rounded border px-2 py-1 text-sm"
+                className="w-40"
               />
-              <select
+              <Select
                 aria-label="Payment method"
                 value={payMethod}
                 onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                className="rounded border px-2 py-1 text-sm"
+                className="w-40"
               >
                 <option value="bank_transfer">Bank transfer</option>
                 <option value="cash">Cash</option>
                 <option value="other">Other</option>
-              </select>
-              <input
+              </Select>
+              <Input
                 type="text"
                 placeholder="Note (optional)"
                 value={payNote}
                 onChange={(e) => setPayNote(e.target.value)}
-                className="flex-1 rounded border px-2 py-1 text-sm"
+                className="flex-1"
               />
-              <button type="submit" className="bg-brand text-white">
-                Record payment
-              </button>
+              <Button type="submit">Record payment</Button>
             </form>
             {payments.length === 0 ? (
               <p className="text-sm text-muted">No payments yet.</p>
@@ -564,12 +549,14 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                       {p.paid_on} · ${p.amount} · {p.method}
                       {p.note ? ` · ${p.note}` : ""}
                     </span>
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      aria-label={`Delete payment of $${p.amount} on ${p.paid_on}`}
                       onClick={() => onDeletePayment(p.id)}
-                      
                     >
                       Delete
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -580,27 +567,26 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
 
       <p className="mt-6">
         <Link href="/app/leases" className="text-brand">
-          Back to all leases
+          Back
         </Link>
       </p>
 
       {confirming && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-lg bg-surface p-6 shadow-lg">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete lease"
+            className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg"
+          >
             <p className="mb-4 text-text">Delete this lease? This cannot be undone.</p>
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setConfirming(false)}
-                className="rounded border px-3 py-1 transition hover:bg-gray-50"
-              >
+              <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
                 Cancel
-              </button>
-              <button
-                onClick={onDelete}
-                className="bg-danger text-white"
-              >
+              </Button>
+              <Button variant="danger" size="sm" onClick={onDelete}>
                 Yes, delete
-              </button>
+              </Button>
             </div>
           </div>
         </div>
