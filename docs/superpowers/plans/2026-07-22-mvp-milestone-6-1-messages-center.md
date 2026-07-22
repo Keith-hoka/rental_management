@@ -811,6 +811,10 @@ Then report and wait for approval.
 - Consumes: the notifications API (Task 4).
 - Produces: `@/lib/notifications` client; the `/app/messages` page; a Messages nav link in both dashboard branches.
 
+Per `frontend/AGENTS.md`, this Next.js version may differ from training data — skim the relevant
+guide in `frontend/node_modules/next/dist/docs/` before writing the page, and follow the existing
+`src/app/app/maintenance/page.tsx` client-page pattern.
+
 - [ ] **Step 1: Create the lib**
 
 Create `frontend/src/lib/notifications.ts`:
