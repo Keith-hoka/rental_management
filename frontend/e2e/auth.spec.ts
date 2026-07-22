@@ -51,8 +51,12 @@ test("logging in as the wrong role is refused", async ({ page }) => {
   await page.getByPlaceholder("Password").fill(password);
   await page.getByRole("button", { name: "Log in" }).click();
 
-  // Not getByRole("alert"): Next renders its own route announcer with that role.
-  await expect(page.getByText("This account signs in as landlord.")).toBeVisible();
+  // p[role=alert], not getByRole("alert"): Next renders its own route announcer
+  // with that role. Asserting the exact text also proves the message never
+  // names the account's real role, which would disclose it.
+  await expect(page.locator('p[role="alert"]')).toHaveText(
+    "You chose the wrong role. Select the role this account was created with.",
+  );
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByRole("radio", { name: "Landlord" }).click();

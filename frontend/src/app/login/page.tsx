@@ -16,10 +16,6 @@ const ROLES = [
 
 type Role = (typeof ROLES)[number]["value"];
 
-function readable(role: string) {
-  return role.replace("_", " ");
-}
-
 function LoginForm() {
   const router = useRouter();
   const resetDone = useSearchParams().get("reset") === "success";
@@ -38,11 +34,12 @@ function LoginForm() {
       });
       saveTokens(tokens);
       // The role belongs to the account, not the login form, so the choice is
-      // checked against the real one rather than sent to the server.
+      // checked against the real one rather than sent to the server. The message
+      // stays generic: naming the real role would disclose it to whoever asked.
       const me = await apiFetch<{ role: string }>("/api/v1/auth/me");
       if (me.role !== role) {
         clearTokens();
-        setError(`This account signs in as ${readable(me.role)}.`);
+        setError("You chose the wrong role. Select the role this account was created with.");
         return;
       }
       router.push("/app");
