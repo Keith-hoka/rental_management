@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import {
   deleteProperty,
+  deletePropertyImage,
   getProperty,
   imageSrc,
   updateProperty,
@@ -71,6 +72,15 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       setProp(await uploadPropertyImage(id, file));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Upload failed");
+    }
+  }
+
+  async function onRemoveImage(url: string) {
+    setError(null);
+    try {
+      setProp(await deletePropertyImage(id, url));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Remove failed");
     }
   }
 
@@ -165,13 +175,23 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 {prop.image_urls.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-2">
                     {prop.image_urls.map((url) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={url}
-                        src={imageSrc(url)}
-                        alt="Property"
-                        className="h-24 w-24 rounded-lg object-cover"
-                      />
+                      <div key={url} className="group relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imageSrc(url)}
+                          alt="Property"
+                          className="h-24 w-24 rounded-lg object-cover"
+                        />
+                        {/* Hidden by opacity, not display, so it stays keyboard reachable. */}
+                        <button
+                          type="button"
+                          aria-label="Remove image"
+                          onClick={() => onRemoveImage(url)}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-sm leading-none text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                        >
+                          &times;
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

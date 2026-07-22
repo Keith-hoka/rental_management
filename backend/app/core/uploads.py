@@ -13,6 +13,11 @@ IMAGE_EXTENSIONS = {
 }
 
 
+def delete_image_file(url: str) -> None:
+    """Remove a stored upload. A missing file is not an error worth raising."""
+    Path(settings.upload_dir, Path(url).name).unlink(missing_ok=True)
+
+
 async def save_image(file: UploadFile) -> str:
     """Validate and store an uploaded image; return its /uploads URL."""
     extension = IMAGE_EXTENSIONS.get(file.content_type or "")

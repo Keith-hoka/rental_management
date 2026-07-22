@@ -27,4 +27,10 @@ test("upload an image to a property and see it displayed", async ({ page }) => {
   await page.getByRole("link", { name: "Image Lane" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+/);
   await expect(page.getByAltText("Property")).toBeVisible();
+
+  // The edit form reveals a remove button over each photo on hover.
+  await page.getByRole("link", { name: "Edit" }).click();
+  await page.getByAltText("Property").hover();
+  await page.getByRole("button", { name: "Remove image" }).click();
+  await expect(page.getByAltText("Property")).toHaveCount(0);
 });

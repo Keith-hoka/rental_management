@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.core.uploads import save_image
+from app.core.uploads import delete_image_file, save_image
 from app.models import Lease, Membership, Property, PropertyStatus, PropertyType, Role
 from app.schemas.property import ActiveLease, PropertyCreate, PropertyResponse, PropertyUpdate
 
@@ -151,6 +151,25 @@ async def delete_property(
     await session.delete(prop)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.delete("/{property_id}/images", response_model=PropertyResponse)
+async def delete_image(
+    property_id: uuid.UUID,
+    url: str,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> PropertyResponse:
+    """Remove one image from a property and delete the stored file."""
+    prop = await get_owned_property(property_id, membership, session)
+    if url not in prop.image_urls:
+        raise HTTPException(status_code=404, detail="Image not found")
+    prop.image_urls = [u for u in prop.image_urls if u != url]
+    await session.commit()
+    await session.refresh(prop)
+    delete_image_file(url)
+    active = await active_leases_by_property(session, membership.organization_id, [prop.id])
+    return build_property_response(prop, active.get(prop.id))
 
 
 @router.post("/{property_id}/images", response_model=PropertyResponse)

@@ -45,3 +45,41 @@ async def test_upload_image_in_other_org_is_404(client, monkeypatch, tmp_path):
         headers=org_b,
     )
     assert response.status_code == 404
+
+
+async def test_delete_image_removes_url_and_file(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+    headers = await landlord_headers(client, "imgdel@example.com")
+    property_id = (
+        await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=headers)
+    ).json()["id"]
+    uploaded = (
+        await client.post(
+            f"/api/v1/properties/{property_id}/images",
+            files={"file": ("a.png", b"\x89PNG bytes", "image/png")},
+            headers=headers,
+        )
+    ).json()
+    url = uploaded["image_urls"][-1]
+    assert (tmp_path / url.rsplit("/", 1)[1]).exists()
+
+    response = await client.delete(
+        f"/api/v1/properties/{property_id}/images", params={"url": url}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert url not in response.json()["image_urls"]
+    assert not (tmp_path / url.rsplit("/", 1)[1]).exists()
+
+
+async def test_delete_unknown_image_is_404(client):
+    headers = await landlord_headers(client, "imgdel404@example.com")
+    property_id = (
+        await client.post("/api/v1/properties", json=NEW_PROPERTY, headers=headers)
+    ).json()["id"]
+    response = await client.delete(
+        f"/api/v1/properties/{property_id}/images",
+        params={"url": "/uploads/missing.png"},
+        headers=headers,
+    )
+    assert response.status_code == 404

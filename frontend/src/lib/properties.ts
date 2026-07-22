@@ -82,6 +82,11 @@ export async function uploadPropertyImage(id: string, file: File): Promise<Prope
   return response.json();
 }
 
+export function deletePropertyImage(id: string, url: string) {
+  const query = encodeURIComponent(url);
+  return apiFetch<Property>(`/api/v1/properties/${id}/images?url=${query}`, { method: "DELETE" });
+}
+
 /** Resolve a stored image URL (relative /uploads/... or absolute) to a full src. */
 export function imageSrc(url: string): string {
   return url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
