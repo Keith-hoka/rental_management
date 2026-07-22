@@ -90,3 +90,42 @@ async def test_cannot_read_another_users_notification(client, db_session):
 
 async def test_requires_auth(client):
     assert (await client.get("/api/v1/me/notifications")).status_code == 401
+
+
+async def test_delete_own_notification(client, db_session):
+    email = "ndel@example.com"
+    headers = await landlord_headers(client, email)
+    user, org_id = await _user_and_org(db_session, email)
+    await _add(db_session, user, org_id, "Goes away")
+    await _add(db_session, user, org_id, "Stays")
+    listed = (await client.get("/api/v1/me/notifications", headers=headers)).json()
+    doomed = next(n for n in listed if n["title"] == "Goes away")
+
+    assert (
+        await client.delete(f"/api/v1/me/notifications/{doomed['id']}", headers=headers)
+    ).status_code == 204
+
+    remaining = (await client.get("/api/v1/me/notifications", headers=headers)).json()
+    assert [n["title"] for n in remaining] == ["Stays"]
+
+
+async def test_cannot_delete_another_users_notification(client, db_session):
+    owner_email = "ndown@example.com"
+    await landlord_headers(client, owner_email)
+    owner, org_id = await _user_and_org(db_session, owner_email)
+    await _add(db_session, owner, org_id, "Not yours")
+    row = (
+        (await db_session.execute(select(Notification).where(Notification.user_id == owner.id)))
+        .scalars()
+        .first()
+    )
+
+    other = await landlord_headers(client, "ndother@example.com")
+    resp = await client.delete(f"/api/v1/me/notifications/{row.id}", headers=other)
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Notification not found"
+
+    still_there = (
+        await db_session.execute(select(Notification).where(Notification.id == row.id))
+    ).scalar_one_or_none()
+    assert still_there is not None, "another user's delete must not remove the row"

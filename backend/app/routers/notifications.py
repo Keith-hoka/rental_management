@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -92,3 +92,24 @@ async def mark_all_read(
         notification.read_at = now
     await session.commit()
     return UnreadCount(count=0)
+
+
+@router.delete("/me/notifications/{notification_id}", status_code=204)
+async def delete_notification(
+    notification_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Delete one of the caller's own notifications."""
+    notification = (
+        await session.execute(
+            select(Notification).where(
+                Notification.id == notification_id, Notification.user_id == user.id
+            )
+        )
+    ).scalar_one_or_none()
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    await session.delete(notification)
+    await session.commit()
+    return Response(status_code=204)

@@ -30,3 +30,7 @@ export function markRead(id: string) {
 export function markAllRead() {
   return apiFetch<UnreadCount>("/api/v1/me/notifications/read_all", { method: "POST" });
 }
+
+export function deleteNotification(id: string) {
+  return apiFetch<void>(`/api/v1/me/notifications/${id}`, { method: "DELETE" });
+}

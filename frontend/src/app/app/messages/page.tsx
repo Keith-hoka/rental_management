@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  deleteNotification,
   listNotifications,
   markAllRead,
   markRead,
@@ -11,7 +12,15 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { PortalShell } from "@/components/portal-shell";
 import { useShell } from "@/components/use-shell";
-import { Button, DataList, DataRow, EmptyState, PageHeader, Select } from "@/components/ui";
+import {
+  Button,
+  ConfirmDialog,
+  DataList,
+  DataRow,
+  EmptyState,
+  PageHeader,
+  Select,
+} from "@/components/ui";
 
 const FILTERS = [
   { label: "All categories", value: "" },
@@ -24,6 +33,7 @@ export default function MessagesPage() {
   const { me, unread, logOut } = useShell();
   const [items, setItems] = useState<NotificationInfo[]>([]);
   const [filter, setFilter] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     if (!me) return;
@@ -38,6 +48,12 @@ export default function MessagesPage() {
 
   async function refresh() {
     setItems(await listNotifications());
+  }
+
+  async function onDelete(id: string) {
+    setDeleting(null);
+    await deleteNotification(id);
+    await refresh();
   }
 
   if (!me) return null;
@@ -114,6 +130,14 @@ export default function MessagesPage() {
                   Mark read
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Delete message ${n.title}`}
+                onClick={() => setDeleting(n.id)}
+              >
+                Delete
+              </Button>
             </div>
           </DataRow>
         ))}
@@ -123,6 +147,14 @@ export default function MessagesPage() {
           </DataRow>
         )}
       </DataList>
+      <ConfirmDialog
+        open={deleting !== null}
+        label="Delete message"
+        message="Delete this message? This cannot be undone."
+        confirmLabel="Yes, delete"
+        onConfirm={() => deleting && onDelete(deleting)}
+        onCancel={() => setDeleting(null)}
+      />
     </Shell>
   );
 }
