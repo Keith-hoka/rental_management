@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 
@@ -113,3 +114,36 @@ async def test_stats_org_isolation(client, db_session):
     stats = await dashboard_stats(db_session, b_org, today)
     assert float(stats.collected_this_month) == 0.0
     assert stats.properties_total == 0
+
+
+async def test_dashboard_overdue_matches_the_rent_summary(client, db_session):
+    email = "xcheck@example.com"
+    headers = await landlord_headers(client, email)
+    org_id = await _org_id(db_session, email)
+    today = date.today()
+    property_id = await make_property(client, headers, "1 Cross St")
+    lease_id = (
+        await client.post(
+            f"/api/v1/properties/{property_id}/leases", json=lease_body(), headers=headers
+        )
+    ).json()["id"]
+    for days in (40, 10):
+        db_session.add(
+            Charge(
+                organization_id=org_id,
+                lease_id=uuid.UUID(lease_id),
+                period_start=today - timedelta(days=days),
+                period_end=today - timedelta(days=days - 29),
+                due_date=today - timedelta(days=days),
+                amount_due=Decimal("1000"),
+            )
+        )
+    await db_session.commit()
+
+    stats = await dashboard_stats(db_session, org_id, today)
+    body = (await client.get("/api/v1/rent/summary", headers=headers)).json()
+    summary_total = sum(Decimal(str(g["total"])) for g in body["overdue"])
+
+    # Two code paths now compute "overdue" from the same rows. A divergence here
+    # is a real bug and is otherwise invisible.
+    assert stats.overdue == summary_total

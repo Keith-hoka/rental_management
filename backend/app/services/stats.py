@@ -16,7 +16,7 @@ from app.models import (
     Role,
 )
 from app.schemas.stats import DashboardStats, MonthlyIncome
-from app.services.payments import lease_balance
+from app.services.payments import org_charge_statuses, summarize
 
 
 async def _count(session: AsyncSession, stmt) -> int:
@@ -57,10 +57,16 @@ async def dashboard_stats(session: AsyncSession, organization_id, today: date) -
         .scalars()
         .all()
     )
+    # One pass for the organization: lease_balance issues two queries each, so
+    # the old loop cost 2N.
+    by_lease = await org_charge_statuses(session, organization_id, today)
     outstanding = Decimal("0")
     overdue = Decimal("0")
-    for lease in leases:
-        balance = await lease_balance(session, lease.id, today)
+    for statuses in by_lease.values():
+        # summarize needs total_paid only for credit, which the dashboard does
+        # not read; the allocated total keeps it at zero without a third query.
+        paid = sum((s.amount_paid for s in statuses), Decimal("0"))
+        balance = summarize(statuses, paid, today)
         outstanding += balance.outstanding
         overdue += balance.overdue_amount
 
