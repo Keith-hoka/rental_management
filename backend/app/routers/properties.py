@@ -1,23 +1,15 @@
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import require_roles
+from app.core.uploads import save_image
 from app.models import Lease, Membership, Property, PropertyStatus, PropertyType, Role
 from app.schemas.property import ActiveLease, PropertyCreate, PropertyResponse, PropertyUpdate
-
-IMAGE_EXTENSIONS = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-}
 
 router = APIRouter(prefix="/api/v1/properties", tags=["properties"])
 
@@ -170,16 +162,8 @@ async def upload_image(
 ) -> PropertyResponse:
     """Upload an image for a property and append its URL to the property."""
     prop = await get_owned_property(property_id, membership, session)
-    extension = IMAGE_EXTENSIONS.get(file.content_type or "")
-    if extension is None:
-        raise HTTPException(status_code=400, detail="Unsupported image type")
-
-    name = f"{uuid.uuid4().hex}{extension}"
-    directory = Path(settings.upload_dir)
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / name).write_bytes(await file.read())
-
-    prop.image_urls = [*prop.image_urls, f"/uploads/{name}"]
+    url = await save_image(file)
+    prop.image_urls = [*prop.image_urls, url]
     await session.commit()
     await session.refresh(prop)
     active = await active_leases_by_property(session, membership.organization_id, [prop.id])
