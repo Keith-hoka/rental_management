@@ -5,7 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import Lease, LeaseReminder, Property
-from app.services.notify import manager_emails, roster_emails, safe_send
+from app.services.notify import (
+    lease_tenant_user_ids,
+    manager_emails,
+    manager_user_ids,
+    notify_users,
+    roster_emails,
+    safe_send,
+)
 
 
 def _bucket(days_left: int, thresholds: list[int]) -> int | None:
@@ -73,6 +80,18 @@ async def run_expiry_reminders(session: AsyncSession, today: date) -> int:
         )
         for email in roster_emails(lease):
             await safe_send(email, tenant_subject, tenant_html)
+
+        recipients = await manager_user_ids(session, lease.organization_id)
+        recipients += await lease_tenant_user_ids(session, lease.id)
+        await notify_users(
+            session,
+            recipients,
+            lease.organization_id,
+            "lease_expiry",
+            f"Lease expiring in {days_left} days",
+            f"The lease for {lease.tenant_name} at {address} expires on {lease.end_date}.",
+            f"/app/leases/{lease.id}",
+        )
 
         session.add(LeaseReminder(lease_id=lease.id, threshold_days=bucket))
         await session.commit()
