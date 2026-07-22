@@ -1,14 +1,11 @@
-import logging
 from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.email import send_email
-from app.models import Lease, LeaseReminder, Membership, Property, Role, User
-
-logger = logging.getLogger(__name__)
+from app.models import Lease, LeaseReminder, Property
+from app.services.notify import manager_emails, roster_emails, safe_send
 
 
 def _bucket(days_left: int, thresholds: list[int]) -> int | None:
@@ -33,24 +30,6 @@ async def _expiring_leases(
     return list(result.all())
 
 
-async def _manager_emails(session: AsyncSession, organization_id) -> list[str]:
-    """Emails of the landlords and property managers in the organization."""
-    result = await session.execute(
-        select(User.email)
-        .join(Membership, Membership.user_id == User.id)
-        .where(
-            Membership.organization_id == organization_id,
-            Membership.role.in_([Role.landlord, Role.property_manager]),
-        )
-    )
-    return [email for (email,) in result.all()]
-
-
-def _roster_emails(lease: Lease) -> list[str]:
-    """The tenant contact emails on the lease (main tenant plus co-tenants)."""
-    return [lease.tenant_email] + [c["email"] for c in lease.co_tenants]
-
-
 async def _already_sent(session: AsyncSession, lease_id, threshold: int) -> bool:
     result = await session.execute(
         select(LeaseReminder.id).where(
@@ -59,14 +38,6 @@ async def _already_sent(session: AsyncSession, lease_id, threshold: int) -> bool
         )
     )
     return result.first() is not None
-
-
-async def _safe_send(to: str, subject: str, html: str) -> None:
-    """Send one reminder; a failure is logged and swallowed, never aborting the run."""
-    try:
-        await send_email(to, subject, html)
-    except Exception:  # noqa: BLE001 - a failed email must not abort the run
-        logger.exception("Failed to send expiry reminder to %s", to)
 
 
 async def run_expiry_reminders(session: AsyncSession, today: date) -> int:
@@ -90,8 +61,8 @@ async def run_expiry_reminders(session: AsyncSession, today: date) -> int:
             f"{lease.end_date} ({days_left} days).</p>"
             f'<p><a href="{link}">View the lease</a></p>'
         )
-        for email in await _manager_emails(session, lease.organization_id):
-            await _safe_send(email, manager_subject, manager_html)
+        for email in await manager_emails(session, lease.organization_id):
+            await safe_send(email, manager_subject, manager_html)
 
         tenant_subject = f"Your lease expires in {days_left} days - {address}"
         tenant_html = (
@@ -100,8 +71,8 @@ async def run_expiry_reminders(session: AsyncSession, today: date) -> int:
             "<p>Please contact your landlord about renewal.</p>"
             f'<p><a href="{settings.frontend_url}/app">Open your tenant portal</a></p>'
         )
-        for email in _roster_emails(lease):
-            await _safe_send(email, tenant_subject, tenant_html)
+        for email in roster_emails(lease):
+            await safe_send(email, tenant_subject, tenant_html)
 
         session.add(LeaseReminder(lease_id=lease.id, threshold_days=bucket))
         await session.commit()

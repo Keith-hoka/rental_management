@@ -37,7 +37,7 @@ def captured(monkeypatch):
     async def fake_send(to, subject, html):
         calls.append((to, subject))
 
-    monkeypatch.setattr("app.services.reminders.send_email", fake_send)
+    monkeypatch.setattr("app.services.notify.send_email", fake_send)
     return calls
 
 
@@ -133,7 +133,7 @@ async def test_email_failure_still_records(client, db_session, monkeypatch):
     async def boom(to, subject, html):
         raise RuntimeError("smtp down")
 
-    monkeypatch.setattr("app.services.reminders.send_email", boom)
+    monkeypatch.setattr("app.services.notify.send_email", boom)
     headers = await landlord_headers(client, "boom@example.com")
     property_id = await make_property(client, headers)
     today = date.today()
