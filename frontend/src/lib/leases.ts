@@ -22,6 +22,9 @@ export interface Lease {
   start_date: string;
   end_date: string;
   created_at: string;
+  renewed_from_id: string | null;
+  // Only GET /leases/{id} fills this in; it is null on the list endpoints.
+  renewed_to_id: string | null;
 }
 
 export interface LeaseInput {
@@ -35,6 +38,15 @@ export interface LeaseInput {
   notice_period_days: number | null;
   start_date: string;
   end_date: string;
+}
+
+export interface LeaseRenewInput {
+  end_date: string;
+  start_date?: string;
+  rent_amount?: number;
+  rent_frequency?: LeaseFrequency;
+  bond_amount?: number | null;
+  notice_period_days?: number | null;
 }
 
 export type LeaseState = "active" | "upcoming" | "ended";
@@ -73,6 +85,13 @@ export function getLease(id: string) {
 export function updateLease(id: string, input: Partial<LeaseInput>) {
   return apiFetch<Lease>(`/api/v1/leases/${id}`, {
     method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function renewLease(id: string, input: LeaseRenewInput) {
+  return apiFetch<Lease>(`/api/v1/leases/${id}/renew`, {
+    method: "POST",
     body: JSON.stringify(input),
   });
 }

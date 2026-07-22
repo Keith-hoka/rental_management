@@ -6,7 +6,16 @@ import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
-import { Badge, Button, Card, Input, PageHeader, Select } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  PageHeader,
+  Select,
+  linkButtonOutline,
+  linkButtonSecondary,
+} from "@/components/ui";
 import {
   deleteLease,
   getLease,
@@ -256,7 +265,34 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
       <div className="mx-auto max-w-2xl">
-        <PageHeader title={editing ? "Edit lease" : "Lease"} />
+        {/* Fixed labels rather than the address: the address is already the
+            heading below, and a duplicate accessible name breaks strict mode. */}
+        <PageHeader
+          title={editing ? "Edit lease" : "Lease"}
+          actions={
+            !editing && (
+              <>
+                {lease.renewed_to_id ? (
+                  <Link href={`/app/leases/${lease.renewed_to_id}`} className={linkButtonOutline}>
+                    View renewal
+                  </Link>
+                ) : (
+                  <Link href={`/app/leases/${leaseId}/renew`} className={linkButtonOutline}>
+                    Renew lease
+                  </Link>
+                )}
+                {lease.renewed_from_id && (
+                  <Link
+                    href={`/app/leases/${lease.renewed_from_id}`}
+                    className={linkButtonSecondary}
+                  >
+                    View previous lease
+                  </Link>
+                )}
+              </>
+            )
+          }
+        />
       {error && (
         <p className="mb-2 text-sm text-danger" role="alert">
           {error}
