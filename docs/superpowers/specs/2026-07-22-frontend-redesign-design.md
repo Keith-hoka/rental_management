@@ -135,7 +135,13 @@ The sidebar puts Properties / Leases / Maintenance / Messages / Team / Contact i
 password on **every** manager page. Where a page already contains an in-page link of the same name,
 the page now has two matches and Playwright's strict mode fails the locator.
 
-Known case: the property detail page has a "Leases" link, queried by `getByRole("link", { name: "Leases" })`.
+Known case: the **properties list** page renders a per-row "Leases" shortcut
+(`src/app/app/properties/page.tsx`), and `e2e/leases.spec.ts` clicks
+`getByRole("link", { name: "Leases" })` while on `/app/properties`. Today that resolves because the
+page has exactly one property row; adding a sidebar "Leases" link makes it two matches.
+
+The dashboard's own uses of that locator (`leases.spec.ts` navigating from `/app`) stay unambiguous:
+those links move out of the page body and into the sidebar, so there is still exactly one match.
 
 **Resolution:** the shell's nav is `<nav aria-label="Main">` and page content lives in the shell's
 `<main>`. Affected specs scope the locator to the landmark:
