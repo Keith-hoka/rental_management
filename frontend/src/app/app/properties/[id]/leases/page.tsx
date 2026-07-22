@@ -1,62 +1,62 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAccessToken } from "@/lib/auth";
 import { listLeases, type Lease } from "@/lib/leases";
+import { AppShell } from "@/components/app-shell";
+import { useShell } from "@/components/use-shell";
+import { DataList, DataRow, EmptyState, PageHeader } from "@/components/ui";
 
 export default function PropertyLeasesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
+  const { me, unread, logOut } = useShell();
   const [leases, setLeases] = useState<Lease[]>([]);
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.replace("/login");
-      return;
-    }
+    if (!me) return;
     let active = true;
     listLeases(id)
-      .then((l) => {
-        if (active) setLeases(l);
-      })
-      .catch(() => {
-        if (active) setLeases([]);
-      });
+      .then((l) => active && setLeases(l))
+      .catch(() => active && setLeases([]));
     return () => {
       active = false;
     };
-  }, [id, router]);
+  }, [id, me]);
+
+  if (!me) return null;
 
   return (
-    <main className="mx-auto max-w-lg p-8">
-      <h1 className="mb-4 text-2xl font-semibold">Leases</h1>
-      <p className="mb-4 text-sm text-gray-600">
+    <AppShell me={me} unread={unread} onLogOut={logOut}>
+      <PageHeader title="Leases" />
+      <p className="mb-4 text-sm text-muted">
         This property&apos;s leases. Add new leases from the{" "}
-        <Link href="/app/leases" className="text-blue-600">
+        <Link href="/app/leases" className="text-brand">
           Leases page
         </Link>
         .
       </p>
-      <ul className="space-y-2">
+      <DataList>
         {leases.map((lease) => (
-          <li key={lease.id} className="rounded border p-3">
-            <Link href={`/app/leases/${lease.id}`} className="text-blue-600">
+          <DataRow key={lease.id}>
+            <Link href={`/app/leases/${lease.id}`} className="font-medium text-text">
               {lease.tenant_name}
             </Link>
-            <span className="ml-2 text-sm text-gray-600">
+            <span className="ml-2 text-muted">
               {lease.start_date} to {lease.end_date}
             </span>
-          </li>
+          </DataRow>
         ))}
-        {leases.length === 0 && <li className="text-gray-500">No leases yet.</li>}
-      </ul>
+        {leases.length === 0 && (
+          <DataRow>
+            <EmptyState>No leases yet.</EmptyState>
+          </DataRow>
+        )}
+      </DataList>
       <p className="mt-6">
-        <Link href="/app/properties" className="text-blue-600">
+        <Link href="/app/properties" className="text-brand">
           Back to properties
         </Link>
       </p>
-    </main>
+    </AppShell>
   );
 }

@@ -1,78 +1,90 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAccessToken } from "@/lib/auth";
 import { listProperties, type Property } from "@/lib/properties";
+import { AppShell } from "@/components/app-shell";
+import { useShell } from "@/components/use-shell";
+import {
+  Badge,
+  DataList,
+  DataRow,
+  EmptyState,
+  Input,
+  PageHeader,
+  Select,
+  linkButton,
+} from "@/components/ui";
 
 export default function PropertiesPage() {
-  const router = useRouter();
+  const { me, unread, logOut } = useShell();
   const [properties, setProperties] = useState<Property[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.replace("/login");
-      return;
-    }
+    if (!me) return;
+    let active = true;
     listProperties({ search, status })
-      .then(setProperties)
-      .catch(() => setProperties([]));
-  }, [router, search, status]);
+      .then((p) => active && setProperties(p))
+      .catch(() => active && setProperties([]));
+    return () => {
+      active = false;
+    };
+  }, [me, search, status]);
+
+  if (!me) return null;
 
   return (
-    <main className="p-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Properties</h1>
-        <Link href="/app/properties/new" className="rounded bg-blue-600 px-3 py-2 text-white">
-          New property
-        </Link>
-      </div>
-      <div className="mb-4 flex gap-2">
-        <input
+    <AppShell me={me} unread={unread} onLogOut={logOut}>
+      <PageHeader
+        title="Properties"
+        actions={
+          <Link href="/app/properties/new" className={linkButton}>
+            New property
+          </Link>
+        }
+      />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Input
           placeholder="Search address"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="rounded border px-3 py-2"
+          className="max-w-xs"
         />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="rounded border px-3 py-2"
-        >
+        <Select value={status} onChange={(e) => setStatus(e.target.value)} className="max-w-48">
           <option value="">All statuses</option>
           <option value="vacant">Vacant</option>
           <option value="occupied">Occupied</option>
-        </select>
+        </Select>
       </div>
-      <ul className="space-y-2">
+      <DataList>
         {properties.map((p) => (
-          <li key={p.id} className="flex items-center justify-between rounded border p-3">
-            <span>
-              <Link href={`/app/properties/${p.id}`} className="text-blue-600">
-                {p.address}
-              </Link>
-              <span data-testid="status" className="ml-2 text-sm text-gray-600">
-                {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking · {p.status}
+          <DataRow key={p.id}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <Link href={`/app/properties/${p.id}`} className="font-medium text-text">
+                  {p.address}
+                </Link>
+                <span data-testid="status" className="ml-2 text-muted">
+                  {p.type} · {p.bedrooms} bed · {p.bathrooms} bath · {p.parking} parking
+                </span>
+                <span className="ml-2">
+                  <Badge tone={p.status === "occupied" ? "success" : "warning"}>{p.status}</Badge>
+                </span>
               </span>
-            </span>
-            <Link
-              href={`/app/properties/${p.id}/leases`}
-              className="ml-2 shrink-0 text-sm text-blue-600"
-            >
-              Leases
-            </Link>
-          </li>
+              <Link href={`/app/properties/${p.id}/leases`} className="shrink-0 text-brand">
+                Leases
+              </Link>
+            </div>
+          </DataRow>
         ))}
-        {properties.length === 0 && <li className="text-gray-500">No properties yet.</li>}
-      </ul>
-      <p className="mt-6">
-        <Link href="/app" className="text-blue-600">
-          Back to dashboard
-        </Link>
-      </p>
-    </main>
+        {properties.length === 0 && (
+          <DataRow>
+            <EmptyState>No properties yet.</EmptyState>
+          </DataRow>
+        )}
+      </DataList>
+    </AppShell>
   );
 }
