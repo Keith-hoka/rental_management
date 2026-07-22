@@ -8,6 +8,7 @@ const MANAGE = [
   { href: "/app", label: "Dashboard" },
   { href: "/app/properties", label: "Properties" },
   { href: "/app/leases", label: "Leases" },
+  { href: "/app/payments", label: "Payments" },
   { href: "/app/maintenance", label: "Maintenance" },
   { href: "/app/messages", label: "Messages" },
   { href: "/app/team", label: "Team" },
@@ -83,8 +84,8 @@ export function AppShell({
             />
           ))}
         </div>
-        {/* mt-auto pins settings to the bottom of the sidebar on desktop. */}
-        <div className="mt-6 space-y-1 md:mt-auto md:pt-6">
+        {/* mt-auto bottom-anchors settings; mb keeps it clear of the very edge. */}
+        <div className="mt-6 space-y-1 md:mt-auto md:mb-10 md:pt-6">
           <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted uppercase">
             Settings
           </p>
@@ -100,10 +101,17 @@ export function AppShell({
         </div>
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border bg-surface px-6 py-3">
-          <p data-testid="welcome" className="text-sm text-muted">
-            Welcome, {me.name} ({me.role})
-          </p>
+        <header className="flex items-center justify-end border-b border-border bg-surface px-6 py-3">
+          {/* Keeps data-testid="welcome" with both name and role: auth.spec
+              asserts the element contains "E2E User (landlord)". */}
+          <div data-testid="welcome" className="flex items-center gap-2 text-sm">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-on-soft">
+              {me.name.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="text-text">
+              {me.name} ({me.role})
+            </span>
+          </div>
         </header>
         <main className="min-w-0 flex-1 p-6">{children}</main>
       </div>

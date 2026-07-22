@@ -288,7 +288,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
-      <PageHeader title="Dashboard" />
+      <PageHeader title={`Welcome, ${me.name}`} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
           {stats && (
@@ -336,25 +336,25 @@ export default function DashboardPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="text-xs text-muted">
+                  <thead className="border-b border-border bg-surface-2 text-xs text-muted">
                     <tr>
-                      <th className="pb-2 font-medium">Date</th>
-                      <th className="pb-2 font-medium">Property</th>
-                      <th className="pb-2 font-medium">Tenant</th>
-                      <th className="pb-2 font-medium">Method</th>
-                      <th className="pb-2 text-right font-medium">Amount</th>
+                      <th className="px-3 py-2 font-medium">Date</th>
+                      <th className="px-3 py-2 font-medium">Property info</th>
+                      <th className="px-3 py-2 font-medium">Tenant name</th>
+                      <th className="px-3 py-2 font-medium">Method</th>
+                      <th className="px-3 py-2 text-right font-medium">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {recent.map((p) => (
                       <tr key={p.id}>
-                        <td className="py-2 text-muted">{p.paid_on}</td>
-                        <td className="py-2 text-text">{p.property_address}</td>
-                        <td className="py-2 text-muted">{p.tenant_name}</td>
-                        <td className="py-2">
+                        <td className="px-3 py-2 text-muted">{p.paid_on}</td>
+                        <td className="px-3 py-2 text-text">{p.property_address}</td>
+                        <td className="px-3 py-2 text-muted">{p.tenant_name}</td>
+                        <td className="px-3 py-2">
                           <Badge tone="brand">{p.method.replace("_", " ")}</Badge>
                         </td>
-                        <td className="py-2 text-right font-medium text-text">${p.amount}</td>
+                        <td className="px-3 py-2 text-right font-medium text-text">${p.amount}</td>
                       </tr>
                     ))}
                   </tbody>
