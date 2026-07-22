@@ -12,8 +12,11 @@ const VARIANTS: Record<Variant, string> = {
 const BASE =
   "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50";
 
-/** Shared classes for a Link that should look like a secondary button. */
-export const linkButton = `${BASE} ${VARIANTS.secondary} px-3 py-2`;
+/**
+ * Shared classes for a Link that acts as a page's primary action, so those
+ * links match the primary Button instead of looking like a separate species.
+ */
+export const linkButton = `${BASE} ${VARIANTS.primary} px-3 py-2`;
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;

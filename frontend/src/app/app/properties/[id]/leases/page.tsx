@@ -53,7 +53,7 @@ export default function PropertyLeasesPage({ params }: { params: Promise<{ id: s
         )}
       </DataList>
       <p className="mt-6">
-        <Link href="/app/properties" className="text-brand">
+        <Link href={`/app/properties/${id}`} className="text-brand">
           Back
         </Link>
       </p>
