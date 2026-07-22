@@ -32,3 +32,6 @@ class Lease(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    renewed_from_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leases.id"), unique=True, index=True
+    )
