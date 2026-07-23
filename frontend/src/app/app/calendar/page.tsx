@@ -1,10 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listCalendar, type CalendarEntry, type CalendarKind } from "@/lib/calendar";
+import { useRouter } from "next/navigation";
+import {
+  createEvent,
+  deleteEvent,
+  listCalendar,
+  updateEvent,
+  type CalendarEntry,
+  type CalendarKind,
+} from "@/lib/calendar";
+import { listProperties, type Property } from "@/lib/properties";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
-import { Button, Card, PageHeader } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  Input,
+  PageHeader,
+  Select,
+  Textarea,
+} from "@/components/ui";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -20,6 +37,11 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate(),
   ).padStart(2, "0")}`;
+}
+
+/** A datetime-local input value (local wall-clock) for a Date. */
+function localInput(d: Date): string {
+  return `${ymd(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 /** The 42 days (6 weeks) of a month grid, starting on the Sunday of week one. */
@@ -38,9 +60,26 @@ function entryKey(entry: CalendarEntry): string {
 
 export default function CalendarPage() {
   const { me, unread, logOut } = useShell();
+  const router = useRouter();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+
+  // Event dialog state.
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startLocal, setStartLocal] = useState("");
+  const [endLocal, setEndLocal] = useState("");
+  const [propertyId, setPropertyId] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  async function refresh() {
+    const days = gridDays(year, month);
+    setEntries(await listCalendar(ymd(days[0]), ymd(days[41])));
+  }
 
   useEffect(() => {
     if (!me) return;
@@ -53,6 +92,13 @@ export default function CalendarPage() {
       active = false;
     };
   }, [me, year, month]);
+
+  useEffect(() => {
+    if (!me) return;
+    listProperties()
+      .then(setProperties)
+      .catch(() => setProperties([]));
+  }, [me]);
 
   if (!me) return null;
 
@@ -83,6 +129,54 @@ export default function CalendarPage() {
     setMonth(d.getMonth());
   }
 
+  function openNew(day: Date) {
+    setEditingId(null);
+    setTitle("");
+    setDescription("");
+    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9, 0);
+    const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 10, 0);
+    setStartLocal(localInput(start));
+    setEndLocal(localInput(end));
+    setPropertyId("");
+    setDialogOpen(true);
+  }
+
+  function openEdit(entry: CalendarEntry) {
+    setEditingId(entry.event_id);
+    setTitle(entry.title);
+    setDescription(entry.description ?? "");
+    setStartLocal(localInput(new Date(entry.start_at as string)));
+    setEndLocal(localInput(new Date(entry.end_at as string)));
+    setPropertyId(entry.property_id ?? "");
+    setDialogOpen(true);
+  }
+
+  function onChipClick(entry: CalendarEntry) {
+    if (entry.kind === "event") openEdit(entry);
+    else if (entry.link) router.push(entry.link);
+  }
+
+  async function onSaveEvent() {
+    const body = {
+      title,
+      description: description || null,
+      start_at: new Date(startLocal).toISOString(),
+      end_at: new Date(endLocal).toISOString(),
+      property_id: propertyId || null,
+    };
+    if (editingId) await updateEvent(editingId, body);
+    else await createEvent(body);
+    setDialogOpen(false);
+    await refresh();
+  }
+
+  async function onDeleteEvent() {
+    if (editingId) await deleteEvent(editingId);
+    setConfirmOpen(false);
+    setDialogOpen(false);
+    await refresh();
+  }
+
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
       <PageHeader
@@ -97,6 +191,9 @@ export default function CalendarPage() {
             </Button>
             <Button variant="secondary" size="sm" onClick={() => shift(1)}>
               Next
+            </Button>
+            <Button size="sm" onClick={() => openNew(new Date())}>
+              New event
             </Button>
           </span>
         }
@@ -120,8 +217,11 @@ export default function CalendarPage() {
                   inMonth ? "bg-surface" : "bg-surface-2"
                 }`}
               >
-                <div
-                  className={`text-xs ${
+                <button
+                  type="button"
+                  onClick={() => openNew(day)}
+                  aria-label={`Add event on ${key}`}
+                  className={`block text-xs ${
                     key === todayKey
                       ? "font-bold text-brand-fg"
                       : inMonth
@@ -130,16 +230,18 @@ export default function CalendarPage() {
                   }`}
                 >
                   {day.getDate()}
-                </div>
+                </button>
                 <div className="mt-0.5 space-y-0.5">
                   {dayEntries.map((e, i) => (
-                    <span
+                    <button
                       key={i}
+                      type="button"
                       title={e.title}
-                      className={`block truncate rounded px-1 text-xs ${KIND_TONE[e.kind]}`}
+                      onClick={() => onChipClick(e)}
+                      className={`block w-full truncate rounded px-1 text-left text-xs ${KIND_TONE[e.kind]}`}
                     >
                       {e.title}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -147,6 +249,88 @@ export default function CalendarPage() {
           })}
         </div>
       </Card>
+
+      {dialogOpen && (
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingId ? "Edit event" : "New event"}
+            className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg"
+          >
+            <div className="space-y-3">
+              <label className="block text-sm text-muted">
+                Title
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              </label>
+              <label className="block text-sm text-muted">
+                Description
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-muted">
+                Start
+                <Input
+                  type="datetime-local"
+                  value={startLocal}
+                  onChange={(e) => setStartLocal(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-muted">
+                End
+                <Input
+                  type="datetime-local"
+                  value={endLocal}
+                  onChange={(e) => setEndLocal(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-muted">
+                Property
+                <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
+                  <option value="">No property</option>
+                  {properties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.address}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            </div>
+            <div className="mt-5 flex justify-between gap-2">
+              <span>
+                {editingId && (
+                  <Button variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
+                    Delete
+                  </Button>
+                )}
+              </span>
+              <span className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={onSaveEvent}
+                  disabled={!title || !startLocal || !endLocal}
+                >
+                  Save
+                </Button>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        label="Delete event"
+        message="Delete this event? This cannot be undone."
+        confirmLabel="Yes, delete"
+        onConfirm={onDeleteEvent}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </AppShell>
   );
 }

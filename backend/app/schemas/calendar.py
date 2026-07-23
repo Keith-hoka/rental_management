@@ -42,3 +42,6 @@ class CalendarEntry(BaseModel):
     end_at: datetime | None = None
     link: str | None = None
     event_id: uuid.UUID | None = None
+    # Set only for custom events, so the edit form can prefill without a refetch.
+    description: str | None = None
+    property_id: uuid.UUID | None = None

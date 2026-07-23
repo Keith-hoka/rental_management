@@ -150,7 +150,13 @@ async def test_feed_returns_all_kinds(client, db_session):
 
     await client.post(
         "/api/v1/calendar/events",
-        json=_event_body(start=f"{today}T09:00:00Z", end=f"{today}T10:00:00Z", title="Site visit"),
+        json=_event_body(
+            start=f"{today}T09:00:00Z",
+            end=f"{today}T10:00:00Z",
+            title="Site visit",
+            description="Bring keys",
+            property_id=property_id,
+        ),
         headers=headers,
     )
 
@@ -165,6 +171,8 @@ async def test_feed_returns_all_kinds(client, db_session):
     assert event["all_day"] is False
     assert event["event_id"]
     assert event["start_at"]
+    assert event["description"] == "Bring keys"
+    assert event["property_id"] == property_id
     lease_end = next(e for e in body if e["kind"] == "lease_end")
     assert lease_end["all_day"] is True
     assert lease_end["date"]

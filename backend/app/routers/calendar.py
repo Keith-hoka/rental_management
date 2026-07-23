@@ -210,6 +210,8 @@ async def calendar_feed(
                     start_at=e.start_at,
                     end_at=e.end_at,
                     event_id=e.id,
+                    description=e.description,
+                    property_id=e.property_id,
                 )
             )
     return entries

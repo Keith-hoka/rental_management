@@ -11,6 +11,8 @@ export interface CalendarEntry {
   end_at: string | null;
   link: string | null;
   event_id: string | null;
+  description: string | null;
+  property_id: string | null;
 }
 
 export interface CalendarEventInput {
