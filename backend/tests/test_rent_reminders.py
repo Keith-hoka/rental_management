@@ -56,7 +56,16 @@ async def _charge(db_session, lease, due_date, amount="1500"):
 
 
 async def _notifications(db_session):
-    return (await db_session.execute(select(Notification))).scalars().all()
+    # Ignore the acceptance notice that onboard_tenant now emits to the manager.
+    return (
+        (
+            await db_session.execute(
+                select(Notification).where(Notification.category != "invitation_accepted")
+            )
+        )
+        .scalars()
+        .all()
+    )
 
 
 async def test_due_soon_goes_to_tenants_only(client, db_session, captured):

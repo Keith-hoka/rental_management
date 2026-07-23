@@ -27,6 +27,7 @@ const FILTERS = [
   { label: "Lease", value: "lease" },
   { label: "Rent", value: "rent" },
   { label: "Maintenance", value: "maintenance" },
+  { label: "Invitations", value: "invitation" },
 ];
 
 export default function MessagesPage() {

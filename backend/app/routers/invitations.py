@@ -15,6 +15,7 @@ from app.core.security import hash_password
 from app.models import Invitation, InvitationStatus, LeaseTenant, Membership, Role, User
 from app.routers.auth import issue_tokens
 from app.services.invites import reject_duplicate_invite
+from app.services.notify import manager_user_ids, notify_users
 from app.schemas.auth import TokenPair
 from app.schemas.invitation import (
     AcceptInvitationRequest,
@@ -131,5 +132,27 @@ async def accept_invitation(
     if invite.lease_id is not None:
         session.add(LeaseTenant(lease_id=invite.lease_id, user_id=user.id))
     invite.status = InvitationStatus.accepted
+
+    # Tell the organization's managers who joined, excluding the person who just
+    # accepted (a new manager should not be notified about their own arrival).
+    recipients = [
+        uid for uid in await manager_user_ids(session, invite.organization_id) if uid != user.id
+    ]
+    if invite.lease_id is None:
+        body, link = f"{user.name} accepted your invitation and joined the team.", "/app/team"
+    else:
+        body, link = (
+            f"{user.name} accepted your invitation and joined the lease.",
+            f"/app/leases/{invite.lease_id}",
+        )
+    await notify_users(
+        session,
+        recipients,
+        invite.organization_id,
+        "invitation_accepted",
+        "Invitation accepted",
+        body,
+        link,
+    )
     await session.commit()
     return issue_tokens(str(user.id))

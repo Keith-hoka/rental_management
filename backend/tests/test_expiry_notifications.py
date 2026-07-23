@@ -32,7 +32,16 @@ async def test_expiry_reminder_writes_notifications(client, db_session):
     sent = await run_expiry_reminders(db_session, date.today())
     assert sent == 1
 
-    rows = (await db_session.execute(select(Notification))).scalars().all()
+    # Ignore the acceptance notice that onboard_tenant now emits to the manager.
+    rows = (
+        (
+            await db_session.execute(
+                select(Notification).where(Notification.category != "invitation_accepted")
+            )
+        )
+        .scalars()
+        .all()
+    )
     # One for the landlord user, one for the joined tenant user.
     assert len(rows) == 2
     assert {r.category for r in rows} == {"lease_expiry"}
@@ -48,5 +57,14 @@ async def test_rerunning_adds_no_duplicate_notifications(client, db_session):
     await run_expiry_reminders(db_session, date.today())
     assert await run_expiry_reminders(db_session, date.today()) == 0
 
-    rows = (await db_session.execute(select(Notification))).scalars().all()
+    # Ignore the acceptance notice that onboard_tenant now emits to the manager.
+    rows = (
+        (
+            await db_session.execute(
+                select(Notification).where(Notification.category != "invitation_accepted")
+            )
+        )
+        .scalars()
+        .all()
+    )
     assert len(rows) == 2

@@ -14,7 +14,11 @@ async def _categories(db_session, user_id):
     rows = (
         (
             await db_session.execute(
-                select(Notification.category).where(Notification.user_id == user_id)
+                select(Notification.category).where(
+                    Notification.user_id == user_id,
+                    # Ignore the acceptance notice that onboard_tenant now emits.
+                    Notification.category != "invitation_accepted",
+                )
             )
         )
         .scalars()
