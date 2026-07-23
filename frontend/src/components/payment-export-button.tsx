@@ -23,7 +23,7 @@ export function PaymentExportButton() {
 
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={() => setOpen(true)}>
         Export CSV
       </Button>
       {open && (
