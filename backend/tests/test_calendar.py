@@ -1,9 +1,11 @@
-from datetime import UTC, datetime, timedelta
+import uuid
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.models import CalendarEvent, Membership, User
-from tests.test_leases import make_property
+from app.models import CalendarEvent, Charge, MaintenanceRequest, Membership, User
+from tests.test_leases import lease_body, make_property
 from tests.test_properties_crud import landlord_headers
 
 
@@ -98,3 +100,90 @@ async def test_update_and_delete_event(client):
     assert (
         await client.delete(f"/api/v1/calendar/events/{event_id}", headers=headers)
     ).status_code == 204
+
+
+async def _lease_in_range(client, headers, address):
+    """A lease whose start and end both fall within a +/-40-day window of today."""
+    property_id = await make_property(client, headers, address)
+    today = date.today()
+    lease_id = (
+        await client.post(
+            f"/api/v1/properties/{property_id}/leases",
+            json=lease_body(
+                start_date=str(today - timedelta(days=1)),
+                end_date=str(today + timedelta(days=10)),
+            ),
+            headers=headers,
+        )
+    ).json()["id"]
+    return property_id, lease_id
+
+
+async def test_feed_returns_all_kinds(client, db_session):
+    email = "calfeed@example.com"
+    headers = await landlord_headers(client, email)
+    org_id, user_id = await _org_and_user(db_session, email)
+    property_id, lease_id = await _lease_in_range(client, headers, "1 Calendar Way")
+
+    today = date.today()
+    db_session.add(
+        Charge(
+            organization_id=org_id,
+            lease_id=uuid.UUID(lease_id),
+            period_start=today,
+            period_end=today + timedelta(days=29),
+            due_date=today,
+            amount_due=Decimal("1500"),
+        )
+    )
+    db_session.add(
+        MaintenanceRequest(
+            organization_id=org_id,
+            property_id=uuid.UUID(property_id),
+            lease_id=uuid.UUID(lease_id),
+            created_by=user_id,
+            title="Leaking tap",
+            description="Kitchen",
+        )
+    )
+    await db_session.commit()
+
+    await client.post(
+        "/api/v1/calendar/events",
+        json=_event_body(start=f"{today}T09:00:00Z", end=f"{today}T10:00:00Z", title="Site visit"),
+        headers=headers,
+    )
+
+    start = today - timedelta(days=40)
+    end = today + timedelta(days=40)
+    body = (await client.get(f"/api/v1/calendar?start={start}&end={end}", headers=headers)).json()
+
+    kinds = {e["kind"] for e in body}
+    assert kinds == {"lease_start", "lease_end", "rent_due", "maintenance", "event"}
+
+    event = next(e for e in body if e["kind"] == "event")
+    assert event["all_day"] is False
+    assert event["event_id"]
+    assert event["start_at"]
+    lease_end = next(e for e in body if e["kind"] == "lease_end")
+    assert lease_end["all_day"] is True
+    assert lease_end["date"]
+    assert lease_end["link"] == f"/app/leases/{lease_id}"
+    rent = next(e for e in body if e["kind"] == "rent_due")
+    assert rent["link"] == f"/app/leases/{lease_id}"
+    maint = next(e for e in body if e["kind"] == "maintenance")
+    assert maint["link"] == "/app/maintenance"
+
+
+async def test_feed_is_org_scoped(client, db_session):
+    owner = await landlord_headers(client, "calfeedowner@example.com")
+    await _lease_in_range(client, owner, "2 Private Way")
+    stranger = await landlord_headers(client, "calfeedthief@example.com")
+    today = date.today()
+    body = (
+        await client.get(
+            f"/api/v1/calendar?start={today - timedelta(days=40)}&end={today + timedelta(days=40)}",
+            headers=stranger,
+        )
+    ).json()
+    assert body == []

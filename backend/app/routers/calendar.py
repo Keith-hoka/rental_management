@@ -1,13 +1,19 @@
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.models import CalendarEvent, Membership, Property
+from app.models import CalendarEvent, Charge, Lease, MaintenanceRequest, Membership, Property
 from app.routers.leases import manager
-from app.schemas.calendar import CalendarEventCreate, CalendarEventInfo, CalendarEventUpdate
+from app.schemas.calendar import (
+    CalendarEntry,
+    CalendarEventCreate,
+    CalendarEventInfo,
+    CalendarEventUpdate,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["calendar"])
 
@@ -101,3 +107,109 @@ async def delete_event(
     await session.delete(event)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.get("/calendar", response_model=list[CalendarEntry])
+async def calendar_feed(
+    start: date,
+    end: date,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[CalendarEntry]:
+    """Every dated record in [start, end] for the org: derived kinds plus events."""
+    org = membership.organization_id
+    entries: list[CalendarEntry] = []
+
+    leases = (
+        await session.execute(
+            select(Lease, Property.address)
+            .join(Property, Property.id == Lease.property_id)
+            .where(Lease.organization_id == org)
+        )
+    ).all()
+    for lease, address in leases:
+        if start <= lease.start_date <= end:
+            entries.append(
+                CalendarEntry(
+                    kind="lease_start",
+                    title=f"Lease starts: {address}",
+                    all_day=True,
+                    date=lease.start_date,
+                    link=f"/app/leases/{lease.id}",
+                )
+            )
+        if start <= lease.end_date <= end:
+            entries.append(
+                CalendarEntry(
+                    kind="lease_end",
+                    title=f"Lease ends: {address}",
+                    all_day=True,
+                    date=lease.end_date,
+                    link=f"/app/leases/{lease.id}",
+                )
+            )
+
+    charges = (
+        (
+            await session.execute(
+                select(Charge).where(
+                    Charge.organization_id == org,
+                    Charge.due_date >= start,
+                    Charge.due_date <= end,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    entries += [
+        CalendarEntry(
+            kind="rent_due",
+            title=f"Rent due ${c.amount_due}",
+            all_day=True,
+            date=c.due_date,
+            link=f"/app/leases/{c.lease_id}",
+        )
+        for c in charges
+    ]
+
+    requests = (
+        (
+            await session.execute(
+                select(MaintenanceRequest).where(MaintenanceRequest.organization_id == org)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for r in requests:
+        created = r.created_at.date()
+        if start <= created <= end:
+            entries.append(
+                CalendarEntry(
+                    kind="maintenance",
+                    title=r.title,
+                    all_day=True,
+                    date=created,
+                    link="/app/maintenance",
+                )
+            )
+
+    events = (
+        (await session.execute(select(CalendarEvent).where(CalendarEvent.organization_id == org)))
+        .scalars()
+        .all()
+    )
+    for e in events:
+        if e.start_at.date() <= end and e.end_at.date() >= start:
+            entries.append(
+                CalendarEntry(
+                    kind="event",
+                    title=e.title,
+                    all_day=False,
+                    start_at=e.start_at,
+                    end_at=e.end_at,
+                    event_id=e.id,
+                )
+            )
+    return entries
