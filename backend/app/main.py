@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.scheduler import scheduler, start_scheduler
 from app.routers.auth import router as auth_router
+from app.routers.calendar import router as calendar_router
 from app.routers.contractors import router as contractors_router
 from app.routers.documents import router as documents_router
 from app.routers.invitations import router as invitations_router
@@ -42,6 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth_router)
+app.include_router(calendar_router)
 app.include_router(contractors_router)
 app.include_router(documents_router)
 app.include_router(properties_router)
