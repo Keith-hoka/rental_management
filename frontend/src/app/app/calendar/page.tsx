@@ -54,8 +54,23 @@ function gridDays(year: number, month: number): Date[] {
   );
 }
 
-function entryKey(entry: CalendarEntry): string {
-  return entry.all_day ? (entry.date as string) : ymd(new Date(entry.start_at as string));
+interface Span {
+  entry: CalendarEntry;
+  start: Date;
+  end: Date;
+  startYmd: string;
+  endYmd: string;
+}
+
+/** An entry's inclusive day range: derived kinds are a single date; events span start_at..end_at. */
+function toSpan(entry: CalendarEntry): Span {
+  const start = entry.all_day
+    ? new Date(`${entry.date}T00:00:00`)
+    : new Date(entry.start_at as string);
+  const end = entry.all_day
+    ? new Date(`${entry.date}T00:00:00`)
+    : new Date(entry.end_at as string);
+  return { entry, start, end, startYmd: ymd(start), endYmd: ymd(end) };
 }
 
 export default function CalendarPage() {
@@ -103,13 +118,10 @@ export default function CalendarPage() {
   if (!me) return null;
 
   const days = gridDays(year, month);
-  const byDay = new Map<string, CalendarEntry[]>();
-  for (const e of entries) {
-    const key = entryKey(e);
-    const list = byDay.get(key);
-    if (list) list.push(e);
-    else byDay.set(key, [e]);
-  }
+  const weeks = [0, 1, 2, 3, 4, 5].map((w) => days.slice(w * 7, w * 7 + 7));
+  const spans = entries
+    .map(toSpan)
+    .sort((a, b) => (a.startYmd < b.startYmd ? -1 : a.startYmd > b.startYmd ? 1 : 0));
 
   const monthLabel = new Date(year, month, 1).toLocaleDateString(undefined, {
     month: "long",
@@ -200,49 +212,60 @@ export default function CalendarPage() {
       />
       <Card>
         <p className="mb-3 font-semibold text-text">{monthLabel}</p>
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-0.5 border-b border-border pb-1">
           {WEEKDAYS.map((w) => (
-            <div key={w} className="px-1 pb-1 text-xs font-medium text-muted">
+            <div key={w} className="px-1 text-xs font-medium text-muted">
               {w}
             </div>
           ))}
-          {days.map((day) => {
-            const key = ymd(day);
-            const inMonth = day.getMonth() === month;
-            const dayEntries = byDay.get(key) ?? [];
+        </div>
+        <div className="mt-1 space-y-1">
+          {weeks.map((week, wi) => {
+            const weekStart = ymd(week[0]);
+            const weekEnd = ymd(week[6]);
+            const bars = spans.filter((s) => s.startYmd <= weekEnd && s.endYmd >= weekStart);
             return (
-              <div
-                key={key}
-                className={`min-h-24 rounded-lg border border-border p-1 ${
-                  inMonth ? "bg-surface" : "bg-surface-2"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => openNew(day)}
-                  aria-label={`Add event on ${key}`}
-                  className={`block text-xs ${
-                    key === todayKey
-                      ? "font-bold text-brand-fg"
-                      : inMonth
-                        ? "text-text"
-                        : "text-muted"
-                  }`}
-                >
-                  {day.getDate()}
-                </button>
-                <div className="mt-0.5 space-y-0.5">
-                  {dayEntries.map((e, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      title={e.title}
-                      onClick={() => onChipClick(e)}
-                      className={`block w-full truncate rounded px-1 text-left text-xs ${KIND_TONE[e.kind]}`}
-                    >
-                      {e.title}
-                    </button>
-                  ))}
+              <div key={wi} className="rounded-lg border border-border p-1">
+                <div className="grid grid-cols-7 gap-0.5">
+                  {week.map((day) => {
+                    const key = ymd(day);
+                    const inMonth = day.getMonth() === month;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => openNew(day)}
+                        aria-label={`Add event on ${key}`}
+                        className={`text-left text-xs ${
+                          key === todayKey
+                            ? "font-bold text-brand-fg"
+                            : inMonth
+                              ? "text-text"
+                              : "text-muted"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-0.5 grid min-h-10 grid-cols-7 gap-0.5 content-start">
+                  {bars.map((s, i) => {
+                    const startCol = s.startYmd <= weekStart ? 0 : s.start.getDay();
+                    const endCol = s.endYmd >= weekEnd ? 6 : s.end.getDay();
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        title={s.entry.title}
+                        onClick={() => onChipClick(s.entry)}
+                        style={{ gridColumn: `${startCol + 1} / span ${endCol - startCol + 1}` }}
+                        className={`truncate rounded px-1 text-left text-xs ${KIND_TONE[s.entry.kind]}`}
+                      >
+                        {s.entry.title}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -265,10 +288,7 @@ export default function CalendarPage() {
               </label>
               <label className="block text-sm text-muted">
                 Description
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
               </label>
               <label className="block text-sm text-muted">
                 Start
