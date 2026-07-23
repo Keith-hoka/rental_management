@@ -1,13 +1,24 @@
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.deps import get_current_user
 from app.core.uploads import delete_document_file, save_document
-from app.models import Document, DocumentCategory, DocumentVersion, LeaseTenant, Membership, User
+from app.models import (
+    Document,
+    DocumentCategory,
+    DocumentVersion,
+    LeaseTenant,
+    Membership,
+    Role,
+    User,
+)
 from app.routers.leases import get_owned_lease, manager
 from app.schemas.document import DocumentInfo, DocumentVersionInfo
 from app.services.notify import lease_tenant_user_ids, notify_users
@@ -248,3 +259,53 @@ async def list_my_documents(
         .all()
     )
     return [await _document_info(session, d) for d in documents]
+
+
+async def _can_read_document(session: AsyncSession, document: Document, user: User) -> bool:
+    """True if the user manages the document's org or is a tenant of its lease."""
+    is_manager = (
+        await session.execute(
+            select(Membership.id).where(
+                Membership.user_id == user.id,
+                Membership.organization_id == document.organization_id,
+                Membership.role.in_([Role.landlord, Role.property_manager]),
+            )
+        )
+    ).first()
+    if is_manager is not None:
+        return True
+    is_tenant = (
+        await session.execute(
+            select(LeaseTenant.id).where(
+                LeaseTenant.lease_id == document.lease_id, LeaseTenant.user_id == user.id
+            )
+        )
+    ).first()
+    return is_tenant is not None
+
+
+@router.get("/documents/versions/{version_id}/download")
+async def download_version(
+    version_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> FileResponse:
+    """Stream a document version's file. The single gated path to any file."""
+    version = (
+        await session.execute(select(DocumentVersion).where(DocumentVersion.id == version_id))
+    ).scalar_one_or_none()
+    document = (
+        (
+            await session.execute(select(Document).where(Document.id == version.document_id))
+        ).scalar_one_or_none()
+        if version is not None
+        else None
+    )
+    if version is None or document is None or not await _can_read_document(session, document, user):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return FileResponse(
+        Path(settings.documents_dir, version.stored_name),
+        media_type=version.content_type,
+        filename=version.original_filename,
+    )

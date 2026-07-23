@@ -206,3 +206,49 @@ async def test_tenant_lists_own_lease_documents(client, db_session, tmp_path, mo
     body = (await client.get(f"/api/v1/me/leases/{lease_id}/documents", headers=tenant)).json()
 
     assert [d["title"] for d in body] == ["Your Lease"]
+
+
+async def test_manager_downloads_the_file(client, tmp_path, monkeypatch):
+    headers = await landlord_headers(client, "docdl@example.com")
+    lease_id = await make_lease(client, headers, "9 Download St")
+    version_id = (await _upload(client, headers, lease_id, tmp_path, monkeypatch)).json()[
+        "current_version"
+    ]["id"]
+
+    response = await client.get(
+        f"/api/v1/documents/versions/{version_id}/download", headers=headers
+    )
+
+    assert response.status_code == 200
+    assert response.content == PDF
+    assert response.headers["content-type"].startswith("application/pdf")
+
+
+async def test_tenant_of_another_lease_cannot_download(client, db_session, tmp_path, monkeypatch):
+    owner = await landlord_headers(client, "dlowner@example.com")
+    lease_id = await make_lease(client, owner, "10 Private St")
+    version_id = (await _upload(client, owner, lease_id, tmp_path, monkeypatch)).json()[
+        "current_version"
+    ]["id"]
+
+    other_mgr = await landlord_headers(client, "dlother@example.com")
+    other_lease = await make_lease(client, other_mgr, "11 Other St")
+    stranger = await onboard_tenant(
+        client, db_session, other_mgr, other_lease, "dlstranger@example.com"
+    )
+
+    response = await client.get(
+        f"/api/v1/documents/versions/{version_id}/download", headers=stranger
+    )
+    assert response.status_code == 404
+
+
+async def test_unauthenticated_download_is_rejected(client, tmp_path, monkeypatch):
+    headers = await landlord_headers(client, "dlnoauth@example.com")
+    lease_id = await make_lease(client, headers, "12 NoAuth St")
+    version_id = (await _upload(client, headers, lease_id, tmp_path, monkeypatch)).json()[
+        "current_version"
+    ]["id"]
+
+    response = await client.get(f"/api/v1/documents/versions/{version_id}/download")
+    assert response.status_code == 401
