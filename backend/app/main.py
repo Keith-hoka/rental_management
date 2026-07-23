@@ -20,6 +20,7 @@ from app.routers.payments import router as payments_router
 from app.routers.portal import router as portal_router
 from app.routers.properties import router as properties_router
 from app.routers.rent import router as rent_router
+from app.routers.search import router as search_router
 from app.routers.stats import router as stats_router
 
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +55,7 @@ app.include_router(maintenance_router)
 app.include_router(notifications_router)
 app.include_router(payments_router)
 app.include_router(portal_router)
+app.include_router(search_router)
 app.include_router(stats_router)
 
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
