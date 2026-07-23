@@ -7,6 +7,9 @@ __pycache__/
 # Uploaded property images (local dev storage)
 backend/uploads/
 
+# Stored documents (local dev storage)
+backend/documents/
+
 # Node
 node_modules/
 .next/
