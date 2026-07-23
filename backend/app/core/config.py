@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     # Directory where uploaded property images are stored (served at /uploads).
     upload_dir: str = "uploads"
+    # Private document storage, NOT statically served: access is only through
+    # the authenticated download endpoint.
+    documents_dir: str = "documents"
 
 
 settings = Settings()
