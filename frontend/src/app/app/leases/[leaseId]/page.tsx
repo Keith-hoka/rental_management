@@ -46,6 +46,15 @@ import {
   type LeaseReminderInfo,
   type LeaseTenantInfo,
 } from "@/lib/tenants";
+import {
+  listLeaseDocuments,
+  uploadDocument,
+  uploadVersion,
+  deleteDocument,
+  type DocumentInfo,
+  type DocumentCategory,
+} from "@/lib/documents";
+import { DocumentPreview } from "@/components/document-preview";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -93,6 +102,11 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [payNote, setPayNote] = useState("");
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<DocumentInfo[]>([]);
+  const [docTitle, setDocTitle] = useState("");
+  const [docCategory, setDocCategory] = useState<DocumentCategory>("lease");
+  const [previewVersion, setPreviewVersion] = useState<DocumentInfo["current_version"] | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!me) return;
@@ -149,6 +163,13 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       })
       .catch(() => {
         if (active) setPayments([]);
+      });
+    listLeaseDocuments(leaseId)
+      .then((d) => {
+        if (active) setDocuments(d);
+      })
+      .catch(() => {
+        if (active) setDocuments([]);
       });
     return () => {
       active = false;
@@ -266,6 +287,27 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
     setDeletingPayment(null);
     await deleteLeasePayment(leaseId, paymentId);
     await refreshMoney();
+  }
+
+  async function refreshDocuments() {
+    setDocuments(await listLeaseDocuments(leaseId));
+  }
+
+  async function onAddDocument(file: File) {
+    await uploadDocument(leaseId, docTitle || file.name, docCategory, file);
+    setDocTitle("");
+    await refreshDocuments();
+  }
+
+  async function onAddVersion(documentId: string, file: File) {
+    await uploadVersion(documentId, file);
+    await refreshDocuments();
+  }
+
+  async function onDeleteDocument(documentId: string) {
+    setDeletingDoc(null);
+    await deleteDocument(documentId);
+    await refreshDocuments();
   }
 
   return (
@@ -604,6 +646,83 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
               </ul>
             )}
           </Card>
+
+          <Card className="mt-5" title="Documents">
+            <div className="mb-3 flex flex-wrap items-end gap-2">
+              <label className="flex-1 text-sm text-muted">
+                Title
+                <Input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} />
+              </label>
+              <label className="text-sm text-muted">
+                Category
+                <Select
+                  value={docCategory}
+                  onChange={(e) => setDocCategory(e.target.value as DocumentCategory)}
+                >
+                  <option value="lease">Lease</option>
+                  <option value="report">Report</option>
+                  <option value="receipt">Receipt</option>
+                  <option value="other">Other</option>
+                </Select>
+              </label>
+              <label className={`${linkButtonOutline} cursor-pointer`}>
+                Add document
+                <input
+                  type="file"
+                  accept="application/pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onAddDocument(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {documents.length === 0 ? (
+              <p className="text-sm text-muted">No documents yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {documents.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-2 text-sm"
+                  >
+                    <span>
+                      <span className="font-medium text-text">{d.title}</span>{" "}
+                      <Badge tone="neutral">{d.category}</Badge>{" "}
+                      <span className="text-xs text-muted">v{d.current_version.version_number}</span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setPreviewVersion(d.current_version)}
+                      >
+                        Preview
+                      </Button>
+                      <label className={`${linkButtonOutline} cursor-pointer text-xs`}>
+                        New version
+                        <input
+                          type="file"
+                          accept="application/pdf,image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) onAddVersion(d.id, file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      <Button variant="danger" size="sm" onClick={() => setDeletingDoc(d.id)}>
+                        Delete
+                      </Button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </>
       )}
 
@@ -651,6 +770,17 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
         onConfirm={() => deletingPayment && onDeletePayment(deletingPayment)}
         onCancel={() => setDeletingPayment(null)}
       />
+      <ConfirmDialog
+        open={deletingDoc !== null}
+        label="Delete document"
+        message="Delete this document and all its versions? This cannot be undone."
+        confirmLabel="Yes, delete"
+        onConfirm={() => deletingDoc && onDeleteDocument(deletingDoc)}
+        onCancel={() => setDeletingDoc(null)}
+      />
+      {previewVersion && (
+        <DocumentPreview version={previewVersion} onClose={() => setPreviewVersion(null)} />
+      )}
       </div>
     </AppShell>
   );

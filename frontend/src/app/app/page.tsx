@@ -17,6 +17,8 @@ import {
   type MaintenanceInfo,
   type MaintenancePriority,
 } from "@/lib/maintenance";
+import { listMyLeaseDocuments, type DocumentInfo } from "@/lib/documents";
+import { DocumentPreview } from "@/components/document-preview";
 import {
   Bar,
   BarChart,
@@ -80,6 +82,8 @@ export default function DashboardPage() {
   const [chargesByLease, setChargesByLease] = useState<Record<string, ChargeInfo[]>>({});
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [maintByLease, setMaintByLease] = useState<Record<string, MaintenanceInfo[]>>({});
+  const [docsByLease, setDocsByLease] = useState<Record<string, DocumentInfo[]>>({});
+  const [previewVersion, setPreviewVersion] = useState<DocumentInfo["current_version"] | null>(null);
   const [issueTitle, setIssueTitle] = useState("");
   const [issueDesc, setIssueDesc] = useState("");
   const [issuePriority, setIssuePriority] = useState<MaintenancePriority>("medium");
@@ -125,6 +129,14 @@ export default function DashboardPage() {
               ),
             );
             if (active) setMaintByLease(Object.fromEntries(maint));
+            const docs = await Promise.all(
+              l.map((lease) =>
+                listMyLeaseDocuments(lease.id)
+                  .then((d) => [lease.id, d] as const)
+                  .catch(() => [lease.id, []] as const),
+              ),
+            );
+            if (active) setDocsByLease(Object.fromEntries(docs));
           });
         }
         // Each manager panel catches its own failure so one bad response
@@ -336,8 +348,38 @@ export default function DashboardPage() {
                 </DataList>
               </div>
             </Card>
+
+            <Card title="Documents">
+              <DataList>
+                {(docsByLease[l.id] ?? []).map((d) => (
+                  <DataRow key={d.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        <span className="font-medium text-text">{d.title}</span>{" "}
+                        <Badge tone="neutral">{d.category}</Badge>
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setPreviewVersion(d.current_version)}
+                      >
+                        Preview
+                      </Button>
+                    </div>
+                  </DataRow>
+                ))}
+                {(docsByLease[l.id]?.length ?? 0) === 0 && (
+                  <DataRow>
+                    <EmptyState>No documents yet.</EmptyState>
+                  </DataRow>
+                )}
+              </DataList>
+            </Card>
           </div>
         ))}
+        {previewVersion && (
+          <DocumentPreview version={previewVersion} onClose={() => setPreviewVersion(null)} />
+        )}
       </PortalShell>
     );
   }
