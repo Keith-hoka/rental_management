@@ -33,6 +33,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { PortalShell } from "@/components/portal-shell";
 import { PaymentTable } from "@/components/payment-table";
+import { PaymentExportButton } from "@/components/payment-export-button";
 import {
   Badge,
   Button,
@@ -343,7 +344,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell me={me} unread={unread} onLogOut={logOut}>
-      <PageHeader title={`Welcome, ${me.name}`} />
+      <PageHeader title={`Welcome, ${me.name}`} actions={<PaymentExportButton />} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
           {stats && (
