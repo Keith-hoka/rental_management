@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ThemeToggle } from "@/components/ui";
 
@@ -62,7 +62,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const isActive = (href: string) =>
     href === "/app" ? pathname === "/app" : pathname.startsWith(href);
 
@@ -153,6 +155,23 @@ export function AppShell({
               </svg>
             </button>
           </div>
+          <form
+            className="hidden md:block"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const value = query.trim();
+              if (value) router.push(`/app/search?q=${encodeURIComponent(value)}`);
+            }}
+          >
+            <input
+              type="search"
+              aria-label="Search"
+              placeholder="Search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-56 rounded-lg border border-strong bg-surface px-3 py-1.5 text-sm text-text placeholder:text-muted"
+            />
+          </form>
           <div className="ml-auto flex items-center gap-3">
             <ThemeToggle />
             {/* Keeps data-testid="welcome" with both name and role: auth.spec
