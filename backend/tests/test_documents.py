@@ -109,6 +109,8 @@ async def test_second_upload_is_version_two(client, tmp_path, monkeypatch):
     assert response.status_code == 201
     assert response.json()["version_count"] == 2
     assert response.json()["current_version"]["version_number"] == 2
+    # The whole history is returned, newest first, so old versions stay reachable.
+    assert [v["version_number"] for v in response.json()["versions"]] == [2, 1]
 
 
 async def test_upload_rejects_unsupported_type(client, tmp_path, monkeypatch):

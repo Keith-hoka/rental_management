@@ -55,6 +55,7 @@ async def _document_info(session: AsyncSession, document: Document) -> DocumentI
         category=document.category,
         version_count=len(versions),
         current_version=_version_info(versions[0]),
+        versions=[_version_info(v) for v in versions],
         created_at=document.created_at,
     )
 

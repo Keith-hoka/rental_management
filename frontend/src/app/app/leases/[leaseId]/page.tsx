@@ -51,10 +51,13 @@ import {
   uploadDocument,
   uploadVersion,
   deleteDocument,
+  fetchDocumentBlob,
   type DocumentInfo,
   type DocumentCategory,
+  type DocumentVersionInfo,
 } from "@/lib/documents";
 import { DocumentPreview } from "@/components/document-preview";
+import { downloadBlob } from "@/lib/download";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -107,6 +110,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   const [docCategory, setDocCategory] = useState<DocumentCategory>("lease");
   const [previewVersion, setPreviewVersion] = useState<DocumentInfo["current_version"] | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
+  const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!me) return;
@@ -308,6 +312,19 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
     setDeletingDoc(null);
     await deleteDocument(documentId);
     await refreshDocuments();
+  }
+
+  function toggleVersions(documentId: string) {
+    setExpandedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(documentId)) next.delete(documentId);
+      else next.add(documentId);
+      return next;
+    });
+  }
+
+  async function onDownloadVersion(version: DocumentVersionInfo) {
+    downloadBlob(await fetchDocumentBlob(version.id), version.original_filename);
   }
 
   return (
@@ -701,6 +718,9 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                       >
                         Preview
                       </Button>
+                      <Button variant="secondary" size="sm" onClick={() => toggleVersions(d.id)}>
+                        Versions ({d.version_count})
+                      </Button>
                       <label className={`${linkButtonOutline} cursor-pointer text-xs`}>
                         New version
                         <input
@@ -718,6 +738,37 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
                         Delete
                       </Button>
                     </span>
+                    {expandedDocs.has(d.id) && (
+                      <ul className="mt-1 w-full space-y-1 border-t border-border pt-2">
+                        {d.versions.map((v) => (
+                          <li
+                            key={v.id}
+                            className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted"
+                          >
+                            <span>
+                              v{v.version_number} · {v.original_filename} ·{" "}
+                              {new Date(v.created_at).toLocaleDateString()}
+                            </span>
+                            <span className="flex gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setPreviewVersion(v)}
+                              >
+                                Preview
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => onDownloadVersion(v)}
+                              >
+                                Download
+                              </Button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -17,8 +17,14 @@ import {
   type MaintenanceInfo,
   type MaintenancePriority,
 } from "@/lib/maintenance";
-import { listMyLeaseDocuments, type DocumentInfo } from "@/lib/documents";
+import {
+  listMyLeaseDocuments,
+  fetchDocumentBlob,
+  type DocumentInfo,
+  type DocumentVersionInfo,
+} from "@/lib/documents";
 import { DocumentPreview } from "@/components/document-preview";
+import { downloadBlob } from "@/lib/download";
 import {
   Bar,
   BarChart,
@@ -84,6 +90,7 @@ export default function DashboardPage() {
   const [maintByLease, setMaintByLease] = useState<Record<string, MaintenanceInfo[]>>({});
   const [docsByLease, setDocsByLease] = useState<Record<string, DocumentInfo[]>>({});
   const [previewVersion, setPreviewVersion] = useState<DocumentInfo["current_version"] | null>(null);
+  const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
   const [issueTitle, setIssueTitle] = useState("");
   const [issueDesc, setIssueDesc] = useState("");
   const [issuePriority, setIssuePriority] = useState<MaintenancePriority>("medium");
@@ -174,6 +181,19 @@ export default function DashboardPage() {
   async function refreshMaint(leaseId: string) {
     const m = await listLeaseMaintenance(leaseId);
     setMaintByLease((prev) => ({ ...prev, [leaseId]: m }));
+  }
+
+  function toggleVersions(documentId: string) {
+    setExpandedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(documentId)) next.delete(documentId);
+      else next.add(documentId);
+      return next;
+    });
+  }
+
+  async function onDownloadVersion(version: DocumentVersionInfo) {
+    downloadBlob(await fetchDocumentBlob(version.id), version.original_filename);
   }
 
   async function reportIssue(leaseId: string, e: React.FormEvent) {
@@ -358,14 +378,54 @@ export default function DashboardPage() {
                         <span className="font-medium text-text">{d.title}</span>{" "}
                         <Badge tone="neutral">{d.category}</Badge>
                       </span>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setPreviewVersion(d.current_version)}
-                      >
-                        Preview
-                      </Button>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setPreviewVersion(d.current_version)}
+                        >
+                          Preview
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => toggleVersions(d.id)}
+                        >
+                          Versions ({d.version_count})
+                        </Button>
+                      </span>
                     </div>
+                    {expandedDocs.has(d.id) && (
+                      <ul className="mt-2 space-y-1 border-t border-border pt-2">
+                        {d.versions.map((v) => (
+                          <li
+                            key={v.id}
+                            className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted"
+                          >
+                            <span>
+                              v{v.version_number} · {v.original_filename} ·{" "}
+                              {new Date(v.created_at).toLocaleDateString()}
+                            </span>
+                            <span className="flex gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setPreviewVersion(v)}
+                              >
+                                Preview
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => onDownloadVersion(v)}
+                              >
+                                Download
+                              </Button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </DataRow>
                 ))}
                 {(docsByLease[l.id]?.length ?? 0) === 0 && (

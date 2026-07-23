@@ -21,4 +21,5 @@ class DocumentInfo(BaseModel):
     category: DocumentCategory
     version_count: int
     current_version: DocumentVersionInfo
+    versions: list[DocumentVersionInfo]
     created_at: datetime

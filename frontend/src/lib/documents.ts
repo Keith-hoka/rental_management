@@ -18,6 +18,7 @@ export interface DocumentInfo {
   category: DocumentCategory;
   version_count: number;
   current_version: DocumentVersionInfo;
+  versions: DocumentVersionInfo[];
   created_at: string;
 }
 
@@ -27,10 +28,6 @@ export function listLeaseDocuments(leaseId: string) {
 
 export function listMyLeaseDocuments(leaseId: string) {
   return apiFetch<DocumentInfo[]>(`/api/v1/me/leases/${leaseId}/documents`);
-}
-
-export function listDocumentVersions(documentId: string) {
-  return apiFetch<DocumentVersionInfo[]>(`/api/v1/documents/${documentId}/versions`);
 }
 
 export function deleteDocument(documentId: string) {

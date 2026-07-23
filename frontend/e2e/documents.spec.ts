@@ -61,9 +61,15 @@ test("a landlord uploads, versions, previews and deletes a document", async ({ p
     .setInputFiles({ name: "lease-v2.pdf", mimeType: "application/pdf", buffer: PDF });
   await expect(docRow.getByText("v2")).toBeVisible();
 
-  // Preview opens the modal; Close dismisses it.
-  await docRow.getByRole("button", { name: "Preview" }).click();
-  const preview = page.getByRole("dialog", { name: /Preview/ });
+  // Every version stays reachable: expanding the history still lists the
+  // original v1, which the header (showing only the latest) no longer names.
+  await docRow.getByRole("button", { name: "Versions" }).click();
+  const oldVersion = docRow.locator("li").filter({ hasText: "lease.pdf" });
+  await expect(oldVersion).toBeVisible();
+
+  // The old version previews from its own history row.
+  await oldVersion.getByRole("button", { name: "Preview" }).click();
+  const preview = page.getByRole("dialog", { name: "Preview lease.pdf" });
   await expect(preview).toBeVisible();
   await preview.getByRole("button", { name: "Close" }).click();
   await expect(preview).toBeHidden();
