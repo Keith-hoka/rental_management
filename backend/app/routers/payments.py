@@ -1,5 +1,7 @@
+import csv
+import io
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
@@ -40,6 +42,50 @@ async def recent_payments(
         )
         for payment, address, tenant_name in result.all()
     ]
+
+
+@router.get("/payments/export")
+async def export_payments(
+    start: date | None = None,
+    end: date | None = None,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """The organization's payments as CSV, optionally within an inclusive date range."""
+    query = (
+        select(Payment, Property.address, Lease.tenant_name)
+        .join(Lease, Lease.id == Payment.lease_id)
+        .join(Property, Property.id == Lease.property_id)
+        .where(Payment.organization_id == membership.organization_id)
+    )
+    if start is not None:
+        query = query.where(Payment.paid_on >= start)
+    if end is not None:
+        query = query.where(Payment.paid_on <= end)
+    query = query.order_by(Payment.paid_on.asc(), Property.address.asc())
+    rows = (await session.execute(query)).all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["paid_on", "property_address", "tenant_name", "method", "amount", "note"])
+    for payment, address, tenant_name in rows:
+        writer.writerow(
+            [
+                payment.paid_on,
+                address,
+                tenant_name,
+                payment.method.value,
+                payment.amount,
+                payment.note or "",
+            ]
+        )
+
+    today = datetime.now(UTC).date()
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="payments-{today}.csv"'},
+    )
 
 
 @router.post("/leases/{lease_id}/payments", status_code=201, response_model=PaymentInfo)
