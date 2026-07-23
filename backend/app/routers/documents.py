@@ -1,12 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.core.uploads import save_document
-from app.models import Document, DocumentCategory, DocumentVersion, Membership
+from app.core.deps import get_current_user
+from app.core.uploads import delete_document_file, save_document
+from app.models import Document, DocumentCategory, DocumentVersion, LeaseTenant, Membership, User
 from app.routers.leases import get_owned_lease, manager
 from app.schemas.document import DocumentInfo, DocumentVersionInfo
 from app.services.notify import lease_tenant_user_ids, notify_users
@@ -140,3 +141,110 @@ async def add_version(
     await _notify_document_upload(session, document, document.title)
     await session.commit()
     return await _document_info(session, document)
+
+
+@router.get("/leases/{lease_id}/documents", response_model=list[DocumentInfo])
+async def list_documents(
+    lease_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentInfo]:
+    """The documents on a lease in the caller's organization, newest first."""
+    await get_owned_lease(lease_id, membership, session)
+    documents = (
+        (
+            await session.execute(
+                select(Document)
+                .where(Document.lease_id == lease_id)
+                .order_by(Document.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [await _document_info(session, d) for d in documents]
+
+
+@router.get("/documents/{document_id}/versions", response_model=list[DocumentVersionInfo])
+async def list_versions(
+    document_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentVersionInfo]:
+    """Every version of a document, newest first."""
+    document = await get_owned_document(document_id, membership, session)
+    versions = (
+        (
+            await session.execute(
+                select(DocumentVersion)
+                .where(DocumentVersion.document_id == document.id)
+                .order_by(DocumentVersion.version_number.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_version_info(v) for v in versions]
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+async def delete_document(
+    document_id: uuid.UUID,
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Delete a document, all its versions, and their files."""
+    document = await get_owned_document(document_id, membership, session)
+    versions = (
+        (
+            await session.execute(
+                select(DocumentVersion).where(DocumentVersion.document_id == document.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for version in versions:
+        delete_document_file(version.stored_name)
+        await session.delete(version)
+    # Flush the version deletes before removing the document: there is no ORM
+    # relationship to order them, so the FK would otherwise be violated.
+    await session.flush()
+    await session.delete(document)
+    await session.commit()
+    return Response(status_code=204)
+
+
+async def _tenant_lease_or_404(lease_id: uuid.UUID, user: User, session: AsyncSession) -> None:
+    """Raise 404 unless the caller is a tenant of the lease."""
+    owned = (
+        await session.execute(
+            select(LeaseTenant.id).where(
+                LeaseTenant.lease_id == lease_id, LeaseTenant.user_id == user.id
+            )
+        )
+    ).first()
+    if owned is None:
+        raise HTTPException(status_code=404, detail="Lease not found")
+
+
+@router.get("/me/leases/{lease_id}/documents", response_model=list[DocumentInfo])
+async def list_my_documents(
+    lease_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentInfo]:
+    """The documents on a lease the caller is a tenant of."""
+    await _tenant_lease_or_404(lease_id, user, session)
+    documents = (
+        (
+            await session.execute(
+                select(Document)
+                .where(Document.lease_id == lease_id)
+                .order_by(Document.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [await _document_info(session, d) for d in documents]

@@ -145,3 +145,64 @@ async def test_upload_notifies_the_tenant(client, db_session, tmp_path, monkeypa
     assert len(rows) == 1
     mine = (await client.get("/api/v1/me/notifications", headers=tenant)).json()
     assert any(n["category"] == "document_uploaded" for n in mine)
+
+
+async def test_list_documents_for_a_lease(client, tmp_path, monkeypatch):
+    headers = await landlord_headers(client, "doclist@example.com")
+    lease_id = await make_lease(client, headers, "5 List St")
+    await _upload(client, headers, lease_id, tmp_path, monkeypatch, title="Report")
+
+    body = (await client.get(f"/api/v1/leases/{lease_id}/documents", headers=headers)).json()
+
+    assert [d["title"] for d in body] == ["Report"]
+    assert body[0]["version_count"] == 1
+
+
+async def test_other_orgs_document_is_404(client, tmp_path, monkeypatch):
+    owner = await landlord_headers(client, "docowner@example.com")
+    lease_id = await make_lease(client, owner, "6 Mine St")
+    doc_id = (await _upload(client, owner, lease_id, tmp_path, monkeypatch)).json()["id"]
+
+    stranger = await landlord_headers(client, "docthief@example.com")
+    assert (
+        await client.get(f"/api/v1/documents/{doc_id}/versions", headers=stranger)
+    ).status_code == 404
+    assert (await client.delete(f"/api/v1/documents/{doc_id}", headers=stranger)).status_code == 404
+
+
+async def test_delete_removes_document_versions_and_files(
+    client, db_session, tmp_path, monkeypatch
+):
+    headers = await landlord_headers(client, "docdel@example.com")
+    lease_id = await make_lease(client, headers, "7 Del St")
+    doc_id = (await _upload(client, headers, lease_id, tmp_path, monkeypatch)).json()["id"]
+    assert list(tmp_path.iterdir())  # the file exists before delete
+
+    assert (await client.delete(f"/api/v1/documents/{doc_id}", headers=headers)).status_code == 204
+
+    gone = (
+        await db_session.execute(select(Document).where(Document.id == uuid.UUID(doc_id)))
+    ).scalar_one_or_none()
+    assert gone is None
+    versions = (
+        (
+            await db_session.execute(
+                select(DocumentVersion).where(DocumentVersion.document_id == uuid.UUID(doc_id))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert versions == []
+    assert list(tmp_path.iterdir()) == []  # the file was unlinked
+
+
+async def test_tenant_lists_own_lease_documents(client, db_session, tmp_path, monkeypatch):
+    headers = await landlord_headers(client, "doctenant@example.com")
+    lease_id = await make_lease(client, headers, "8 Tenant St")
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, "doctenant-t@example.com")
+    await _upload(client, headers, lease_id, tmp_path, monkeypatch, title="Your Lease")
+
+    body = (await client.get(f"/api/v1/me/leases/{lease_id}/documents", headers=tenant)).json()
+
+    assert [d["title"] for d in body] == ["Your Lease"]
