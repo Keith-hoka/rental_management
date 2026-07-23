@@ -82,14 +82,14 @@ export function AppShell({
   return (
     // h-14 on the bar and top-14 on the drawer are the same 3.5rem: the drawer
     // is fixed, so it has to be told where the bar ends.
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col md:h-dvh md:flex-row md:overflow-hidden">
       {/* Fixed drawer below md so opening it overlays the page instead of
           pushing it down; a static sidebar from md. Still one <nav>: a second
           copy would give every link a duplicate match under strict mode. */}
       <nav
         aria-label="Main"
         onClick={() => setOpen(false)}
-        className={`${open ? "flex" : "hidden"} fixed inset-x-0 top-14 bottom-0 z-30 flex-col overflow-y-auto border-border bg-surface p-3 shadow-lg md:static md:flex md:w-60 md:shrink-0 md:overflow-visible md:border-r md:shadow-none`}
+        className={`${open ? "flex" : "hidden"} fixed inset-x-0 top-14 bottom-0 z-30 flex-col overflow-y-auto border-border bg-surface p-3 shadow-lg md:static md:flex md:w-60 md:shrink-0 md:overflow-y-auto md:border-r md:shadow-none`}
       >
         <div className="mb-4 hidden items-center gap-2 px-2 md:flex">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-semibold text-white">
@@ -124,7 +124,7 @@ export function AppShell({
           </button>
         </div>
       </nav>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col md:overflow-hidden">
         <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 md:static md:px-6">
           {/* Below md the brand and the menu button share this bar with the
               theme toggle and the user, so the app has a single top row. */}
@@ -186,7 +186,7 @@ export function AppShell({
             </div>
           </div>
         </header>
-        <main className="min-w-0 flex-1 p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-6 md:overflow-y-auto">{children}</main>
       </div>
     </div>
   );
