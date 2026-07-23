@@ -23,9 +23,7 @@ export function PaymentExportButton() {
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        Export CSV
-      </Button>
+      <Button onClick={() => setOpen(true)}>Export CSV</Button>
       {open && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
           <div
