@@ -66,6 +66,10 @@ Files are served only through an authenticated endpoint, never the public upload
 - **Deleting removes the whole document, all versions, and their files.** There is no delete of a
   single version: the point of a version history is that it is kept, and removing a middle version
   defeats it.
+- **Uploading notifies the lease's tenants.** Both creating a document and adding a new version
+  write an in-app notification (no email) to the lease's `LeaseTenant`s, linking to the lease, so a
+  tenant sees when a signed lease or receipt is shared without polling. This reuses
+  `notify_users` / `lease_tenant_user_ids` exactly as M7 renewal does.
 
 ---
 
@@ -142,8 +146,8 @@ Manager, `require_roles(landlord, property_manager)`, org-scoped:
 
 | Method | Path | Behaviour |
 |---|---|---|
-| POST | `/leases/{lease_id}/documents` | multipart `title`, `category`, `file` -> creates `Document` + version 1 |
-| POST | `/documents/{document_id}/versions` | multipart `file` -> next `version_number` |
+| POST | `/leases/{lease_id}/documents` | multipart `title`, `category`, `file` -> creates `Document` + version 1; notifies the lease's tenants |
+| POST | `/documents/{document_id}/versions` | multipart `file` -> next `version_number`; notifies the lease's tenants |
 | GET | `/leases/{lease_id}/documents` | list, each with current version + version count |
 | GET | `/documents/{document_id}/versions` | all versions, newest first |
 | DELETE | `/documents/{document_id}` | delete the document, its versions, and their files |
@@ -215,6 +219,8 @@ Backend (`backend/tests/test_documents.py` unless noted):
    URL for a document (the files are private).
 8. An unsupported content type (`text/plain`) is rejected with 400.
 9. Deleting a document removes it, its versions, and unlinks the files from `documents_dir`.
+10. Uploading a document (and adding a version) writes a `document_uploaded` notification for the
+    lease's onboarded tenant.
 
 e2e (`frontend/e2e/documents.spec.ts`): a manager uploads a PDF to a lease, sees it listed with
 version 1, uploads a second file as a new version and sees `v2`, opens the preview modal, and
@@ -227,7 +233,7 @@ job; the e2e proves the flow and the modal.
 
 - Documents attached to a property or the organization rather than a lease.
 - Deleting or rolling back a single version.
-- Notifying the tenant when a document is uploaded.
+- Email notification of uploads (in-app only, matching the renewal and maintenance notifications).
 - Full-text search inside documents (that is the separate search sub-project, over metadata only).
 - Word / `.docx` or other non-PDF, non-image types.
 - Signing or e-signature flows.
@@ -256,8 +262,10 @@ job; the e2e proves the flow and the modal.
 ## Task Breakdown
 
 - **T1** models + enum + migration + round-trip
-- **T2** `save_document` + `documents_dir` + upload / add-version endpoints + tests 2, 3, 8
-- **T3** list / versions / delete + tenant `/me` list + tests 4, 5, 9
+- **T2** `save_document` + `documents_dir` + upload / add-version endpoints + tenant notification +
+  tests 2, 3, 8, 10
+- **T3** list / versions / delete + tenant `/me` list + tests 4, 9 (test 5's cross-lease download
+  is in T4 with the download endpoint)
 - **T4** authenticated download + access control + tests 6, 7
 - **T5** frontend: Documents card, upload, version history, preview modal, tenant read-only
 - **T6** e2e + CI green
