@@ -57,7 +57,7 @@ import {
   type DocumentVersionInfo,
 } from "@/lib/documents";
 import { DocumentPreview } from "@/components/document-preview";
-import { downloadBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/download";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -324,7 +324,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
   }
 
   async function onDownloadVersion(version: DocumentVersionInfo) {
-    downloadBlob(await fetchDocumentBlob(version.id), version.original_filename);
+    await saveBlob(await fetchDocumentBlob(version.id), version.original_filename);
   }
 
   return (

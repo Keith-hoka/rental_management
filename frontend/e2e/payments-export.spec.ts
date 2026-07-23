@@ -9,6 +9,12 @@ function isoDate(offsetDays: number): string {
 }
 
 test("a landlord exports the payment history as CSV", async ({ page }) => {
+  // The native "Save As" picker cannot be driven headlessly. Disable it so the
+  // export runs its fallback: a normal download, which fires a download event.
+  await page.addInitScript(() => {
+    (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker = undefined;
+  });
+
   await page.goto("/signup");
   await page.getByPlaceholder("Your name").fill("Export Owner");
   await page.getByPlaceholder("Organization name").fill("Export Org");

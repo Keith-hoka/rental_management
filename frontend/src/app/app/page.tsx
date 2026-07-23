@@ -24,7 +24,7 @@ import {
   type DocumentVersionInfo,
 } from "@/lib/documents";
 import { DocumentPreview } from "@/components/document-preview";
-import { downloadBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/download";
 import {
   Bar,
   BarChart,
@@ -193,7 +193,7 @@ export default function DashboardPage() {
   }
 
   async function onDownloadVersion(version: DocumentVersionInfo) {
-    downloadBlob(await fetchDocumentBlob(version.id), version.original_filename);
+    await saveBlob(await fetchDocumentBlob(version.id), version.original_filename);
   }
 
   async function reportIssue(leaseId: string, e: React.FormEvent) {

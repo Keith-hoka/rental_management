@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { exportPayments } from "@/lib/payments";
-import { downloadBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/download";
 import { Button, Input } from "@/components/ui";
 
 /**
@@ -17,7 +17,7 @@ export function PaymentExportButton() {
 
   async function onDownload() {
     const blob = await exportPayments(from, to);
-    downloadBlob(blob, "payment history.csv");
+    await saveBlob(blob, "payment history.csv");
     setOpen(false);
   }
 

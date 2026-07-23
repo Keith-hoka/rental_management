@@ -11,6 +11,24 @@ function isoDate(offsetDays: number): string {
 const PDF = Buffer.from("%PDF-1.4 e2e minimal");
 
 test("a landlord uploads, versions, previews and deletes a document", async ({ page }) => {
+  // The native "Save As" picker cannot be driven headlessly, so stand in a fake
+  // that records what saveBlob hands it. This proves the Chromium path flows the
+  // file through the picker with the right name and content.
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      __saved?: { name?: string; size: number };
+      showSaveFilePicker?: (o?: { suggestedName?: string }) => Promise<unknown>;
+    };
+    w.showSaveFilePicker = async (opts) => ({
+      createWritable: async () => ({
+        write: async (data: Blob) => {
+          w.__saved = { name: opts?.suggestedName, size: data.size };
+        },
+        close: async () => {},
+      }),
+    });
+  });
+
   await page.goto("/signup");
   await page.getByPlaceholder("Your name").fill("Docs Owner");
   await page.getByPlaceholder("Organization name").fill("Docs Org");
@@ -73,6 +91,20 @@ test("a landlord uploads, versions, previews and deletes a document", async ({ p
   await expect(preview).toBeVisible();
   await preview.getByRole("button", { name: "Close" }).click();
   await expect(preview).toBeHidden();
+
+  // The old version downloads under its own name, flowing through the picker.
+  await oldVersion.getByRole("button", { name: "Download" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __saved?: { name?: string } }).__saved?.name,
+      ),
+    )
+    .toBe("lease.pdf");
+  const savedSize = await page.evaluate(
+    () => (window as unknown as { __saved?: { size: number } }).__saved?.size ?? 0,
+  );
+  expect(savedSize).toBeGreaterThan(0);
 
   // Delete through the confirmation, and the empty state returns.
   await docRow.getByRole("button", { name: "Delete" }).click();

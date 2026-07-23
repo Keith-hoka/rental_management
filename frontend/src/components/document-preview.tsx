@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchDocumentBlob, type DocumentVersionInfo } from "@/lib/documents";
-import { downloadBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/download";
 import { Button } from "@/components/ui";
 
 /**
@@ -51,7 +51,7 @@ export function DocumentPreview({
             <Button
               variant="secondary"
               size="sm"
-              onClick={async () => downloadBlob(await fetchDocumentBlob(version.id), version.original_filename)}
+              onClick={async () => saveBlob(await fetchDocumentBlob(version.id), version.original_filename)}
             >
               Download
             </Button>
