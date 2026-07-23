@@ -1,4 +1,5 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
 
 export type PaymentMethod = "cash" | "bank_transfer" | "other";
 
@@ -55,4 +56,22 @@ export function listRecentPayments(limit = 8) {
 
 export function getLeaseBalance(leaseId: string) {
   return apiFetch<BalanceInfo>(`/api/v1/leases/${leaseId}/balance`);
+}
+
+export async function exportPayments(start?: string, end?: string): Promise<Blob> {
+  const params = new URLSearchParams();
+  if (start) params.set("start", start);
+  if (end) params.set("end", end);
+  const query = params.toString();
+  // Not apiFetch: that assumes a JSON body. The auth header is still required,
+  // so a plain link would 401.
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/payments/export${query ? `?${query}` : ""}`,
+    {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${getAccessToken() ?? ""}` },
+    },
+  );
+  if (!response.ok) throw new Error("Export failed");
+  return response.blob();
 }

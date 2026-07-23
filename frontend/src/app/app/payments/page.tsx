@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/notifications";
-import { listRecentPayments, type RecentPayment } from "@/lib/payments";
+import { exportPayments, listRecentPayments, type RecentPayment } from "@/lib/payments";
 import { getRentSummary, type RentSummary } from "@/lib/rent";
+import { downloadBlob } from "@/lib/download";
 import { AppShell } from "@/components/app-shell";
 import { PaymentTable } from "@/components/payment-table";
 import { RentGroups } from "@/components/rent-groups";
-import { Card, PageHeader } from "@/components/ui";
+import { Button, Card, Input, PageHeader } from "@/components/ui";
 
 interface Me {
   email: string;
@@ -23,6 +24,8 @@ export default function PaymentsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [unread, setUnread] = useState(0);
   const [payments, setPayments] = useState<RecentPayment[]>([]);
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
   const [rent, setRent] = useState<RentSummary>({ overdue: [], upcoming: [] });
 
   useEffect(() => {
@@ -61,6 +64,11 @@ export default function PaymentsPage() {
     router.replace("/login");
   }
 
+  async function onExport() {
+    const blob = await exportPayments(exportFrom || undefined, exportTo || undefined);
+    downloadBlob(blob, "payments.csv");
+  }
+
   const total = payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
   return (
@@ -82,7 +90,28 @@ export default function PaymentsPage() {
       </Card>
       <Card
         title="Payment history"
-        actions={<span className="text-sm text-muted">${total.toFixed(2)}</span>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted">${total.toFixed(2)}</span>
+            <Input
+              type="date"
+              aria-label="Export from"
+              value={exportFrom}
+              onChange={(e) => setExportFrom(e.target.value)}
+              className="w-40"
+            />
+            <Input
+              type="date"
+              aria-label="Export to"
+              value={exportTo}
+              onChange={(e) => setExportTo(e.target.value)}
+              className="w-40"
+            />
+            <Button variant="secondary" size="sm" onClick={onExport}>
+              Export CSV
+            </Button>
+          </div>
+        }
       >
         <PaymentTable payments={payments} />
       </Card>
