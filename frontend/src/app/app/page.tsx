@@ -23,6 +23,11 @@ import {
   type DocumentInfo,
   type DocumentVersionInfo,
 } from "@/lib/documents";
+import {
+  listMyInspections,
+  type InspectionCondition,
+  type InspectionInfo,
+} from "@/lib/inspections";
 import { DocumentPreview } from "@/components/document-preview";
 import { saveBlob } from "@/lib/download";
 import {
@@ -81,6 +86,12 @@ const STATUS_FILL: Record<string, string> = {
   cancelled: "var(--line-strong)",
 };
 
+const CONDITION_TONE: Record<InspectionCondition, "success" | "warning" | "danger"> = {
+  good: "success",
+  fair: "warning",
+  poor: "danger",
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
@@ -89,6 +100,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [maintByLease, setMaintByLease] = useState<Record<string, MaintenanceInfo[]>>({});
   const [docsByLease, setDocsByLease] = useState<Record<string, DocumentInfo[]>>({});
+  const [inspByLease, setInspByLease] = useState<Record<string, InspectionInfo[]>>({});
   const [previewVersion, setPreviewVersion] = useState<DocumentInfo["current_version"] | null>(null);
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
   const [issueTitle, setIssueTitle] = useState("");
@@ -144,6 +156,14 @@ export default function DashboardPage() {
               ),
             );
             if (active) setDocsByLease(Object.fromEntries(docs));
+            const insp = await Promise.all(
+              l.map((lease) =>
+                listMyInspections(lease.id)
+                  .then((i) => [lease.id, i] as const)
+                  .catch(() => [lease.id, []] as const),
+              ),
+            );
+            if (active) setInspByLease(Object.fromEntries(insp));
           });
         }
         // Each manager panel catches its own failure so one bad response
@@ -431,6 +451,56 @@ export default function DashboardPage() {
                 {(docsByLease[l.id]?.length ?? 0) === 0 && (
                   <DataRow>
                     <EmptyState>No documents yet.</EmptyState>
+                  </DataRow>
+                )}
+              </DataList>
+            </Card>
+
+            <Card title="Inspections">
+              <DataList>
+                {(inspByLease[l.id] ?? []).map((x) => (
+                  <DataRow key={x.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-text capitalize">
+                        {x.type.replace("_", " ")}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm text-muted">{x.scheduled_for}</span>
+                        <Badge tone={x.status === "completed" ? "success" : "brand"}>
+                          {x.status}
+                        </Badge>
+                      </span>
+                    </div>
+                    {x.note && <p className="mt-1 text-muted">{x.note}</p>}
+                    {x.items.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-sm text-text">
+                        {x.items.map((it) => (
+                          <li key={it.id}>
+                            {it.area} —{" "}
+                            <Badge tone={CONDITION_TONE[it.condition]}>{it.condition}</Badge>
+                            {it.note ? ` — ${it.note}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {x.image_urls.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {x.image_urls.map((u) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={u}
+                            src={`${API_BASE_URL}${u}`}
+                            alt=""
+                            className="h-16 w-16 rounded-lg object-cover"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </DataRow>
+                ))}
+                {(inspByLease[l.id]?.length ?? 0) === 0 && (
+                  <DataRow>
+                    <EmptyState>No inspections yet.</EmptyState>
                   </DataRow>
                 )}
               </DataList>
