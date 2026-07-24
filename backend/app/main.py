@@ -13,6 +13,7 @@ from app.routers.calendar import router as calendar_router
 from app.routers.contractors import router as contractors_router
 from app.routers.documents import router as documents_router
 from app.routers.expenses import router as expenses_router
+from app.routers.inspections import router as inspections_router
 from app.routers.invitations import router as invitations_router
 from app.routers.leases import router as leases_router
 from app.routers.maintenance import router as maintenance_router
@@ -50,6 +51,7 @@ app.include_router(calendar_router)
 app.include_router(contractors_router)
 app.include_router(documents_router)
 app.include_router(expenses_router)
+app.include_router(inspections_router)
 app.include_router(properties_router)
 app.include_router(rent_router)
 app.include_router(invitations_router)
