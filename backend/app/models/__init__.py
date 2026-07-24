@@ -4,6 +4,13 @@ from app.models.charge_reminder import ChargeReminder
 from app.models.contractor import Contractor
 from app.models.document import Document, DocumentCategory, DocumentVersion
 from app.models.expense import Expense, ExpenseCategory
+from app.models.inspection import (
+    Inspection,
+    InspectionCondition,
+    InspectionItem,
+    InspectionStatus,
+    InspectionType,
+)
 from app.models.invitation import Invitation, InvitationStatus
 from app.models.lease import Lease, LeaseFrequency
 from app.models.lease_reminder import LeaseReminder
@@ -29,6 +36,11 @@ __all__ = [
     "DocumentVersion",
     "Expense",
     "ExpenseCategory",
+    "Inspection",
+    "InspectionCondition",
+    "InspectionItem",
+    "InspectionStatus",
+    "InspectionType",
     "Invitation",
     "InvitationStatus",
     "Lease",
