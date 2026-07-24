@@ -3,6 +3,7 @@ from datetime import date
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.models import (
     Inspection,
     InspectionCondition,
@@ -12,6 +13,7 @@ from app.models import (
 )
 from tests.test_calendar import _org_and_user
 from tests.test_leases import lease_body, make_property
+from tests.test_portal import onboard_tenant
 from tests.test_properties_crud import landlord_headers
 
 
@@ -208,3 +210,50 @@ async def test_cross_org_patch_and_delete_404(client):
     assert patch.status_code == 404
     delete = await client.delete(f"/api/v1/inspections/{created['id']}", headers=org_b)
     assert delete.status_code == 404
+
+
+async def test_upload_inspection_image_appends_url(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+    headers = await landlord_headers(client, "inspimg@example.com")
+    property_id = await make_property(client, headers, "13 Inspect St")
+    created = (
+        await client.post("/api/v1/inspections", json=_body(property_id), headers=headers)
+    ).json()
+    resp = await client.post(
+        f"/api/v1/inspections/{created['id']}/images",
+        files={"file": ("x.jpg", b"binarydata", "image/jpeg")},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["image_urls"]) == 1
+    assert body["image_urls"][0].startswith("/uploads/")
+
+
+async def test_tenant_lists_own_lease_inspections(client, db_session):
+    headers = await landlord_headers(client, "inspten@example.com")
+    property_id = await make_property(client, headers, "14 Inspect St")
+    lease_id = await make_lease(client, headers, property_id)
+    await client.post(
+        "/api/v1/inspections",
+        json=_body(property_id, lease_id=lease_id),
+        headers=headers,
+    )
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, "itenant@example.com")
+    resp = await client.get(f"/api/v1/me/leases/{lease_id}/inspections", headers=tenant)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert [i["area"] for i in body[0]["items"]] == ["Kitchen"]
+
+
+async def test_tenant_of_another_lease_cannot_see_inspections(client, db_session):
+    headers = await landlord_headers(client, "inspother@example.com")
+    prop_a = await make_property(client, headers, "15 Inspect St")
+    lease_a = await make_lease(client, headers, prop_a)
+    prop_b = await make_property(client, headers, "16 Inspect St")
+    lease_b = await make_lease(client, headers, prop_b)
+    await client.post("/api/v1/inspections", json=_body(prop_a, lease_id=lease_a), headers=headers)
+    tenant_b = await onboard_tenant(client, db_session, headers, lease_b, "itenb@example.com")
+    resp = await client.get(f"/api/v1/me/leases/{lease_a}/inspections", headers=tenant_b)
+    assert resp.status_code == 404

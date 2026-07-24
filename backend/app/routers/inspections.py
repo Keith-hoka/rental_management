@@ -1,11 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.models import Inspection, InspectionItem, Lease, Membership, Property
+from app.core.deps import get_current_user
+from app.core.uploads import save_image
+from app.models import Inspection, InspectionItem, Lease, Membership, Property, User
+from app.routers.documents import _tenant_lease_or_404
 from app.routers.leases import manager
 from app.schemas.inspection import (
     InspectionCreate,
@@ -170,3 +173,39 @@ async def delete_inspection(
     await session.delete(inspection)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.post("/inspections/{inspection_id}/images", response_model=InspectionInfo)
+async def add_image(
+    inspection_id: uuid.UUID,
+    file: UploadFile = File(...),
+    membership: Membership = Depends(manager),
+    session: AsyncSession = Depends(get_session),
+) -> InspectionInfo:
+    inspection = await _owned(inspection_id, membership, session)
+    url = await save_image(file)
+    inspection.image_urls = [*inspection.image_urls, url]
+    await session.commit()
+    await session.refresh(inspection)
+    return await _info(session, inspection)
+
+
+@router.get("/me/leases/{lease_id}/inspections", response_model=list[InspectionInfo])
+async def list_my_inspections(
+    lease_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[InspectionInfo]:
+    await _tenant_lease_or_404(lease_id, user, session)
+    inspections = (
+        (
+            await session.execute(
+                select(Inspection)
+                .where(Inspection.lease_id == lease_id)
+                .order_by(Inspection.scheduled_for.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [await _info(session, i) for i in inspections]
