@@ -41,5 +41,13 @@ class Settings(BaseSettings):
     # the authenticated download endpoint.
     documents_dir: str = "documents"
 
+    # Lease compliance service: both values set enables audits, monitoring
+    # enrolment and the queue/poll jobs; empty disables the whole feature.
+    compliance_api_url: str = ""
+    compliance_api_key: str = ""
+    compliance_queue_interval_minutes: int = 2
+    compliance_poll_hour: int = 7
+    compliance_queue_max_attempts: int = 10
+
 
 settings = Settings()
