@@ -1,3 +1,6 @@
+from sqlalchemy import select
+
+from app.models import ComplianceAuditQueue
 from tests.test_leases import lease_body, make_property
 from tests.test_properties_crud import landlord_headers
 
@@ -58,3 +61,47 @@ async def test_renew_overrides_money_fields(client):
     ).json()
     assert float(renewed["break_fee_amount"]) == 3000.0
     assert float(renewed["holding_deposit_amount"]) == 600.0
+
+
+async def test_editing_compliance_field_enqueues(client, db_session, compliance_on):
+    headers = await landlord_headers(client)
+    lease = await _create_lease(client, headers)
+    await db_session.execute(ComplianceAuditQueue.__table__.delete())
+    await db_session.commit()
+    patched = await client.patch(
+        f"/api/v1/leases/{lease['id']}", json={"break_fee_amount": 2500}, headers=headers
+    )
+    assert patched.status_code == 200
+    queued = (await db_session.execute(select(ComplianceAuditQueue))).scalar_one()
+    assert str(queued.lease_id) == lease["id"]
+
+
+async def test_editing_tenant_details_does_not_enqueue(client, db_session, compliance_on):
+    headers = await landlord_headers(client)
+    lease = await _create_lease(client, headers)
+    await db_session.execute(ComplianceAuditQueue.__table__.delete())
+    await db_session.commit()
+    await client.patch(
+        f"/api/v1/leases/{lease['id']}", json={"tenant_name": "Renamed"}, headers=headers
+    )
+    assert (await db_session.execute(select(ComplianceAuditQueue))).first() is None
+
+
+async def test_editing_when_disabled_does_not_enqueue(client, db_session):
+    headers = await landlord_headers(client)
+    lease = await _create_lease(client, headers)
+    await client.patch(
+        f"/api/v1/leases/{lease['id']}", json={"break_fee_amount": 2500}, headers=headers
+    )
+    assert (await db_session.execute(select(ComplianceAuditQueue))).first() is None
+
+
+async def test_unchanged_value_does_not_enqueue(client, db_session, compliance_on):
+    headers = await landlord_headers(client)
+    lease = await _create_lease(client, headers, **MONEY)
+    await db_session.execute(ComplianceAuditQueue.__table__.delete())
+    await db_session.commit()
+    await client.patch(
+        f"/api/v1/leases/{lease['id']}", json={"break_fee_amount": 2400}, headers=headers
+    )
+    assert (await db_session.execute(select(ComplianceAuditQueue))).first() is None

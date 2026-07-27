@@ -43,6 +43,18 @@ router = APIRouter(prefix="/api/v1", tags=["leases"])
 
 manager = require_roles(Role.landlord, Role.property_manager)
 
+COMPLIANCE_FIELDS = (
+    "rent_amount",
+    "rent_frequency",
+    "start_date",
+    "end_date",
+    "bond_amount",
+    "rent_in_advance_amount",
+    "holding_deposit_amount",
+    "other_security_amount",
+    "break_fee_amount",
+)
+
 
 async def overlapping_lease_exists(
     session: AsyncSession,
@@ -244,8 +256,13 @@ async def update_lease(
     if await overlapping_lease_exists(session, lease.property_id, start, end, exclude_id=lease.id):
         raise HTTPException(status_code=409, detail="Lease dates overlap an existing lease")
 
+    before = tuple(getattr(lease, field) for field in COMPLIANCE_FIELDS)
     for field, value in data.items():
         setattr(lease, field, value)
+    if compliance_enabled():
+        after = tuple(getattr(lease, field) for field in COMPLIANCE_FIELDS)
+        if after != before:
+            await enqueue_audit(session, lease.id)
     await session.commit()
     await session.refresh(lease)
     return lease
