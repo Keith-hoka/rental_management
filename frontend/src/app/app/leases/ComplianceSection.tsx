@@ -6,6 +6,7 @@ import {
   getComplianceAudit,
   runComplianceAudit,
   type ComplianceAuditState,
+  type ComplianceFinding,
   type ComplianceVerdict,
 } from "@/lib/compliance";
 
@@ -14,6 +15,52 @@ const VERDICT_TONE: Record<ComplianceVerdict, "danger" | "success" | "neutral"> 
   green: "success",
   skipped: "neutral",
 };
+
+const RULE_LABELS: Record<string, string> = {
+  "nsw.bond_max_4_weeks": "Bond cap (s159)",
+  "nsw.rent_in_advance_max": "Rent in advance cap (s33)",
+  "nsw.holding_fee_max_1_week": "Holding fee cap (s24)",
+  "nsw.rent_increase_frequency": "Rent increase frequency (s41)",
+  "nsw.rent_increase_first_year": "First-year rent increase (s41)",
+  "nsw.rent_increase_notice": "Rent increase notice (s41)",
+  "nsw.fixed_term_increase_disclosure": "Fixed-term increase disclosure (s42)",
+  "nsw.no_other_security": "No security besides bond (s160)",
+  "nsw.break_fee_cap": "Break fee cap (s107)",
+};
+
+const NOT_RECORDED = "not recorded in this app";
+
+const FIELD_HINTS: Record<string, string> = {
+  bond_amount: "the bond amount",
+  rent_in_advance_amount: `the advance rent amount (${NOT_RECORDED})`,
+  holding_deposit_amount: `the holding fee amount (${NOT_RECORDED})`,
+  other_security_amount: `the other-security amount (${NOT_RECORDED})`,
+  break_fee_amount: `the break fee amount (${NOT_RECORDED})`,
+  rent_increases: "a rent increase history, which builds from renewals with a higher rent",
+  end_date: "the end date",
+};
+
+function skippedDetail(finding: ComplianceFinding): string {
+  const reason = finding.skip_reason ?? "";
+  if (reason.startsWith("missing input:")) {
+    const fields = reason
+      .slice("missing input:".length)
+      .split(",")
+      .map((name) => name.trim());
+    const hints = fields.map((name) => FIELD_HINTS[name] ?? name);
+    return `Needs ${hints.join(" and ")}.`;
+  }
+  if (finding.rule_id === "nsw.fixed_term_increase_disclosure" && reason.includes("not active")) {
+    return "No longer applies: s42 was repealed on 13 Dec 2024.";
+  }
+  if (reason.includes("not active")) {
+    return "Rule not in force at the audit date.";
+  }
+  if (reason.startsWith("section")) {
+    return `Statutory basis not in force at the audit date (${reason}).`;
+  }
+  return finding.summary;
+}
 
 export function ComplianceSection({ leaseId }: { leaseId: string }) {
   const [state, setState] = useState<ComplianceAuditState | null>(null);
@@ -74,8 +121,10 @@ export function ComplianceSection({ leaseId }: { leaseId: string }) {
               <li key={f.rule_id} className="flex items-start gap-2 py-2 text-sm">
                 <Badge tone={VERDICT_TONE[f.verdict]}>{f.verdict}</Badge>
                 <span className="text-text">
-                  {f.summary}
-                  {f.citations[0] && (
+                  <span className="font-medium">{RULE_LABELS[f.rule_id] ?? f.rule_id}</span>
+                  {" - "}
+                  {f.verdict === "skipped" ? skippedDetail(f) : f.summary}
+                  {!RULE_LABELS[f.rule_id] && f.citations[0] && (
                     <span className="text-muted"> (s{f.citations[0].section_no})</span>
                   )}
                 </span>

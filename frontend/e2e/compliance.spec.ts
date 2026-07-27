@@ -50,5 +50,8 @@ test("check now renders findings and the disclaimer", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "NSW compliance" })).toBeVisible();
   await page.getByRole("button", { name: "Check now" }).click();
   await expect(page.getByText("compliant")).toBeVisible();
+  await expect(page.getByText("Bond cap (s159)")).toBeVisible();
+  await expect(page.getByText("not recorded in this app").first()).toBeVisible();
+  await expect(page.getByText("s42 was repealed on 13 Dec 2024")).toBeVisible();
   await expect(page.getByText("General information, not legal advice.")).toBeVisible();
 });
