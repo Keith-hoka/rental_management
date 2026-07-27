@@ -22,6 +22,10 @@ class LeaseCreate(BaseModel):
     rent_amount: Decimal
     rent_frequency: LeaseFrequency
     bond_amount: Decimal | None = None
+    rent_in_advance_amount: Decimal | None = None
+    holding_deposit_amount: Decimal | None = None
+    other_security_amount: Decimal | None = None
+    break_fee_amount: Decimal | None = None
     notice_period_days: int | None = None
     start_date: date
     end_date: date
@@ -35,6 +39,10 @@ class LeaseUpdate(BaseModel):
     rent_amount: Decimal | None = None
     rent_frequency: LeaseFrequency | None = None
     bond_amount: Decimal | None = None
+    rent_in_advance_amount: Decimal | None = None
+    holding_deposit_amount: Decimal | None = None
+    other_security_amount: Decimal | None = None
+    break_fee_amount: Decimal | None = None
     notice_period_days: int | None = None
     start_date: date | None = None
     end_date: date | None = None
@@ -48,6 +56,10 @@ class LeaseRenew(BaseModel):
     rent_amount: Decimal | None = None
     rent_frequency: LeaseFrequency | None = None
     bond_amount: Decimal | None = None
+    rent_in_advance_amount: Decimal | None = None
+    holding_deposit_amount: Decimal | None = None
+    other_security_amount: Decimal | None = None
+    break_fee_amount: Decimal | None = None
     notice_period_days: int | None = None
 
 
@@ -63,6 +75,10 @@ class LeaseResponse(BaseModel):
     rent_amount: Decimal
     rent_frequency: LeaseFrequency
     bond_amount: Decimal | None
+    rent_in_advance_amount: Decimal | None
+    holding_deposit_amount: Decimal | None
+    other_security_amount: Decimal | None
+    break_fee_amount: Decimal | None
     notice_period_days: int | None
     start_date: date
     end_date: date

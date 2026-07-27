@@ -140,6 +140,24 @@ async def renew_lease(
         rent_amount=body.rent_amount if body.rent_amount is not None else source.rent_amount,
         rent_frequency=body.rent_frequency or source.rent_frequency,
         bond_amount=body.bond_amount if body.bond_amount is not None else source.bond_amount,
+        rent_in_advance_amount=(
+            body.rent_in_advance_amount
+            if body.rent_in_advance_amount is not None
+            else source.rent_in_advance_amount
+        ),
+        holding_deposit_amount=(
+            body.holding_deposit_amount
+            if body.holding_deposit_amount is not None
+            else source.holding_deposit_amount
+        ),
+        other_security_amount=(
+            body.other_security_amount
+            if body.other_security_amount is not None
+            else source.other_security_amount
+        ),
+        break_fee_amount=(
+            body.break_fee_amount if body.break_fee_amount is not None else source.break_fee_amount
+        ),
         notice_period_days=(
             body.notice_period_days
             if body.notice_period_days is not None
