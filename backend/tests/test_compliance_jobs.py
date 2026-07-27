@@ -143,3 +143,30 @@ async def test_poll_rerun_is_idempotent(client, db_session, compliance_on, fake_
     fake_feed(lease["id"], new_audit_id=audit_id)
     assert await poll_audit_changes(db_session) == 0
     assert len((await db_session.execute(select(LeaseAudit))).scalars().all()) == 1
+
+
+async def test_backfill_enqueues_only_active_unaudited(
+    client, db_session, compliance_on, fake_create
+):
+    from app.compliance_backfill import backfill
+
+    headers = await landlord_headers(client)
+    audited = await _make_lease(client, headers)
+    plain = await _make_lease(client, headers)
+    renewed = await _make_lease(client, headers)
+    await client.post(
+        f"/api/v1/leases/{renewed['id']}/renew", json={"end_date": "2027-12-31"}, headers=headers
+    )
+    await db_session.execute(ComplianceAuditQueue.__table__.delete())
+    await db_session.commit()
+    await client.post(f"/api/v1/leases/{audited['id']}/compliance-audit", headers=headers)
+
+    count = await backfill(db_session)
+    queued = {
+        str(row.lease_id)
+        for row in (await db_session.execute(select(ComplianceAuditQueue))).scalars().all()
+    }
+    assert audited["id"] not in queued
+    assert renewed["id"] not in queued
+    assert plain["id"] in queued
+    assert count == len(queued)
