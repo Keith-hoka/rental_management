@@ -1,48 +1,10 @@
 import uuid
 
-import pytest
 from sqlalchemy import select
 
-from app.core.config import settings
 from app.models import ComplianceAuditQueue, LeaseAudit
 from tests.test_leases import lease_body, make_property
 from tests.test_properties_crud import landlord_headers
-
-FAKE_AUDIT = {
-    "id": str(uuid.uuid4()),
-    "jurisdiction": "NSW",
-    "as_at": "2026-07-27",
-    "engine_version": "1.0.0",
-    "client_ref": None,
-    "findings": [
-        {
-            "rule_id": "nsw.bond_max_4_weeks",
-            "verdict": "green",
-            "summary": "Bond ok.",
-            "evidence": {},
-            "citations": [],
-            "skip_reason": None,
-        }
-    ],
-    "created_at": "2026-07-27T00:00:00Z",
-}
-
-
-@pytest.fixture
-def compliance_on(monkeypatch):
-    monkeypatch.setattr(settings, "compliance_api_url", "http://localhost:8100")
-    monkeypatch.setattr(settings, "compliance_api_key", "dev-key")
-
-
-@pytest.fixture
-def fake_create(monkeypatch):
-    async def _fake(payload):
-        body = dict(FAKE_AUDIT)
-        body["id"] = str(uuid.uuid4())
-        body["client_ref"] = payload["client_ref"]
-        return body
-
-    monkeypatch.setattr("app.services.compliance.create_audit", _fake)
 
 
 async def _make_lease(client, headers):

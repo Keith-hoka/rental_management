@@ -1,5 +1,6 @@
 """Client, mapper and jobs for the lease-compliance-service integration."""
 
+import logging
 import uuid
 from datetime import date
 from itertools import pairwise
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import ComplianceAuditQueue, Lease, LeaseAudit
+
+logger = logging.getLogger(__name__)
 
 TIMEOUT = 10.0
 
@@ -123,3 +126,32 @@ async def enqueue_audit(session: AsyncSession, lease_id) -> None:
         .on_conflict_do_nothing(index_elements=["lease_id"])
     )
     await session.execute(statement)
+
+
+async def drain_audit_queue(session: AsyncSession) -> int:
+    """Audit every queued lease; delete rows on success, count attempts on failure."""
+    rows = (
+        (
+            await session.execute(
+                select(ComplianceAuditQueue)
+                .where(ComplianceAuditQueue.attempts < settings.compliance_queue_max_attempts)
+                .order_by(ComplianceAuditQueue.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    done = 0
+    for row in rows:
+        lease = (await session.execute(select(Lease).where(Lease.id == row.lease_id))).scalar_one()
+        try:
+            await run_lease_audit(session, lease)
+        except Exception as exc:  # noqa: BLE001 - one bad row must not stop the drain
+            row.attempts += 1
+            row.last_error = str(exc)
+            await session.commit()
+            continue
+        await session.delete(row)
+        await session.commit()
+        done += 1
+    return done

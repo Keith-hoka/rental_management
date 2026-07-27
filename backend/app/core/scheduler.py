@@ -3,10 +3,13 @@ from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.config import settings
 from app.core.db import SessionLocal
 from app.services.charges import generate_charges
+from app.services.compliance import drain_audit_queue
+from app.services.compliance import enabled as compliance_enabled
 from app.services.reminders import run_expiry_reminders
 from app.services.rent_reminders import run_rent_reminders
 
@@ -36,6 +39,14 @@ async def _rent_job() -> None:
     logger.info("rent reminders: sent %s", count)
 
 
+async def _compliance_drain_job() -> None:
+    """Open a session and drain the compliance audit queue."""
+    async with SessionLocal() as session:
+        count = await drain_audit_queue(session)
+    if count:
+        logger.info("compliance queue: audited %s", count)
+
+
 def start_scheduler() -> None:
     """Register the daily reminder and charge-generation jobs and start the scheduler."""
     scheduler.add_job(
@@ -56,4 +67,11 @@ def start_scheduler() -> None:
         id="rent_reminders",
         replace_existing=True,
     )
+    if compliance_enabled():
+        scheduler.add_job(
+            _compliance_drain_job,
+            IntervalTrigger(minutes=settings.compliance_queue_interval_minutes),
+            id="compliance_drain",
+            replace_existing=True,
+        )
     scheduler.start()
