@@ -7,6 +7,31 @@ from sqlalchemy import select
 from app.models import Lease, LeaseFrequency, Organization, Property, PropertyType
 
 
+async def make_lease_row(db_session, **overrides) -> Lease:
+    """An organization, property and lease written straight through the models."""
+    org = Organization(name="Helper Org", currency="USD")
+    db_session.add(org)
+    await db_session.flush()
+    prop = Property(organization_id=org.id, address="1 Helper St", type=PropertyType.house)
+    db_session.add(prop)
+    await db_session.flush()
+    fields = {
+        "organization_id": org.id,
+        "property_id": prop.id,
+        "tenant_name": "Tina Tenant",
+        "tenant_email": "tina@example.com",
+        "rent_amount": Decimal("1500.00"),
+        "rent_frequency": LeaseFrequency.monthly,
+        "start_date": date(2026, 1, 1),
+        "end_date": date(2026, 12, 31),
+    }
+    fields.update(overrides)
+    lease = Lease(**fields)
+    db_session.add(lease)
+    await db_session.flush()
+    return lease
+
+
 async def test_create_lease(db_session):
     org = Organization(name="Keith Properties", currency="USD")
     db_session.add(org)
