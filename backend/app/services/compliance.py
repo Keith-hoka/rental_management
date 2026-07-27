@@ -1,8 +1,13 @@
 """Client, mapper and jobs for the lease-compliance-service integration."""
 
+from itertools import pairwise
+
 import httpx
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models import Lease
 
 TIMEOUT = 10.0
 
@@ -49,3 +54,43 @@ async def list_changes(since: str | None, limit: int = 100) -> list[dict]:
         )
         response.raise_for_status()
         return response.json()
+
+
+async def load_chain(session: AsyncSession, lease: Lease) -> list[Lease]:
+    """The renewal chain ending at this lease, oldest first."""
+    chain = [lease]
+    current = lease
+    while current.renewed_from_id is not None:
+        current = (
+            await session.execute(select(Lease).where(Lease.id == current.renewed_from_id))
+        ).scalar_one()
+        chain.append(current)
+    return list(reversed(chain))
+
+
+def chain_to_audit_payload(chain: list[Lease]) -> dict:
+    """The compliance audit request for a renewal chain.
+
+    start_date is the tenancy start (chain root): the 12-month first-increase
+    rule measures from the tenancy, and successive agreements are continuous.
+    An empty synthesis omits rent_increases entirely (None, not []): in-place
+    rent edits are invisible here, so an empty list would falsely assert that
+    the rent never increased.
+    """
+    newest = chain[-1]
+    lease_body: dict = {
+        "rent_amount": str(newest.rent_amount),
+        "rent_frequency": newest.rent_frequency.value,
+        "start_date": chain[0].start_date.isoformat(),
+        "end_date": newest.end_date.isoformat(),
+    }
+    if newest.bond_amount is not None:
+        lease_body["bond_amount"] = str(newest.bond_amount)
+    increases = [
+        {"effective_on": later.start_date.isoformat(), "new_amount": str(later.rent_amount)}
+        for earlier, later in pairwise(chain)
+        if later.rent_amount > earlier.rent_amount
+    ]
+    if increases:
+        lease_body["rent_increases"] = increases
+    return {"jurisdiction": "NSW", "client_ref": str(newest.id), "lease": lease_body}
