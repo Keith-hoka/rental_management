@@ -10,6 +10,7 @@ from app.core.db import SessionLocal
 from app.services.charges import generate_charges
 from app.services.compliance import drain_audit_queue
 from app.services.compliance import enabled as compliance_enabled
+from app.services.compliance import poll_audit_changes
 from app.services.reminders import run_expiry_reminders
 from app.services.rent_reminders import run_rent_reminders
 
@@ -47,6 +48,13 @@ async def _compliance_drain_job() -> None:
         logger.info("compliance queue: audited %s", count)
 
 
+async def _compliance_poll_job() -> None:
+    """Open a session and apply the compliance change feed."""
+    async with SessionLocal() as session:
+        count = await poll_audit_changes(session)
+    logger.info("compliance changes: applied %s", count)
+
+
 def start_scheduler() -> None:
     """Register the daily reminder and charge-generation jobs and start the scheduler."""
     scheduler.add_job(
@@ -72,6 +80,12 @@ def start_scheduler() -> None:
             _compliance_drain_job,
             IntervalTrigger(minutes=settings.compliance_queue_interval_minutes),
             id="compliance_drain",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _compliance_poll_job,
+            CronTrigger(hour=settings.compliance_poll_hour),
+            id="compliance_poll",
             replace_existing=True,
         )
     scheduler.start()
