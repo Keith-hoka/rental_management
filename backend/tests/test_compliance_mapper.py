@@ -39,7 +39,7 @@ async def test_compliance_tables_round_trip(db_session):
     assert (await db_session.execute(select(ComplianceAuditQueue))).scalar_one().attempts == 0
 
 
-def _lease(start, end, rent, bond=None, prev=None):
+def _lease(start, end, rent, bond=None, prev=None, **money):
     lease = Lease(
         id=uuid_mod.uuid4(),
         organization_id=uuid_mod.uuid4(),
@@ -53,6 +53,7 @@ def _lease(start, end, rent, bond=None, prev=None):
         start_date=date.fromisoformat(start),
         end_date=date.fromisoformat(end),
         renewed_from_id=prev.id if prev is not None else None,
+        **{name: Decimal(value) for name, value in money.items()},
     )
     return lease
 
@@ -104,3 +105,38 @@ async def test_load_chain_walks_to_root(db_session):
     await db_session.commit()
     chain = await load_chain(db_session, newest)
     assert [lease.id for lease in chain] == [root.id, middle.id, newest.id]
+
+
+def test_payload_sends_money_fields_when_set():
+    lease = _lease(
+        "2026-01-01",
+        "2026-12-31",
+        600,
+        rent_in_advance_amount=1200,
+        holding_deposit_amount=600,
+        other_security_amount=0,
+        break_fee_amount=2400,
+    )
+    body = chain_to_audit_payload([lease])["lease"]
+    assert body["rent_in_advance_amount"] == "1200"
+    assert body["holding_deposit_amount"] == "600"
+    assert body["other_security_amount"] == "0"
+    assert body["break_fee_amount"] == "2400"
+
+
+def test_payload_omits_null_money_fields():
+    body = chain_to_audit_payload([_lease("2026-01-01", "2026-12-31", 600)])["lease"]
+    for field in (
+        "rent_in_advance_amount",
+        "holding_deposit_amount",
+        "other_security_amount",
+        "break_fee_amount",
+    ):
+        assert field not in body
+
+
+def test_payload_uses_newest_lease_money_fields():
+    first = _lease("2024-01-01", "2024-12-31", 600, break_fee_amount=9999)
+    second = _lease("2025-01-01", "2025-12-31", 600, prev=first, break_fee_amount=2400)
+    body = chain_to_audit_payload([first, second])["lease"]
+    assert body["break_fee_amount"] == "2400"

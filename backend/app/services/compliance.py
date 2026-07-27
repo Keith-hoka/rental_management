@@ -93,8 +93,16 @@ def chain_to_audit_payload(chain: list[Lease]) -> dict:
         "start_date": chain[0].start_date.isoformat(),
         "end_date": newest.end_date.isoformat(),
     }
-    if newest.bond_amount is not None:
-        lease_body["bond_amount"] = str(newest.bond_amount)
+    for field in (
+        "bond_amount",
+        "rent_in_advance_amount",
+        "holding_deposit_amount",
+        "other_security_amount",
+        "break_fee_amount",
+    ):
+        value = getattr(newest, field)
+        if value is not None:
+            lease_body[field] = str(value)
     increases = [
         {"effective_on": later.start_date.isoformat(), "new_amount": str(later.rent_amount)}
         for earlier, later in pairwise(chain)
