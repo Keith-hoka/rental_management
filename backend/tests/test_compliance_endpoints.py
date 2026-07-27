@@ -72,3 +72,13 @@ async def test_cross_org_lease_is_404(client, compliance_on, fake_create):
     outsider = await landlord_headers(client, email="other-org@example.com")
     response = await client.post(f"/api/v1/leases/{lease['id']}/compliance-audit", headers=outsider)
     assert response.status_code == 404
+
+
+async def test_delete_audited_lease_cascades(client, db_session, compliance_on, fake_create):
+    headers = await landlord_headers(client)
+    lease = await _make_lease(client, headers)
+    await client.post(f"/api/v1/leases/{lease['id']}/compliance-audit", headers=headers)
+    deleted = await client.delete(f"/api/v1/leases/{lease['id']}", headers=headers)
+    assert deleted.status_code == 204
+    assert (await db_session.execute(select(LeaseAudit))).first() is None
+    assert (await db_session.execute(select(ComplianceAuditQueue))).first() is None
