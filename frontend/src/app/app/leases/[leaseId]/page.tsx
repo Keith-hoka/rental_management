@@ -35,6 +35,7 @@ import {
   type BalanceInfo,
   type PaymentMethod,
 } from "@/lib/payments";
+import { ComplianceSection } from "@/app/app/leases/ComplianceSection";
 import { TenantFields } from "@/app/app/leases/TenantFields";
 import {
   inviteTenant,
@@ -774,6 +775,8 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
               </ul>
             )}
           </Card>
+
+          <ComplianceSection leaseId={leaseId} />
         </>
       )}
 
