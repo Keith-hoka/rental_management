@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 TIMEOUT = 10.0
 CURSOR_KEY = "audit_changes_cursor"
+PAGE_LIMIT = 100
 
 
 def enabled() -> bool:
@@ -186,60 +187,83 @@ async def _lease_for_change(session: AsyncSession, client_ref: str) -> Lease | N
     return None if superseded else lease
 
 
+async def _apply_change(session: AsyncSession, change: dict) -> list[tuple[str, str, str]] | None:
+    """Store one change's new audit and queue its notifications; None when skipped.
+
+    Returns the (to, subject, html) emails to send after the caller commits.
+    """
+    lease = await _lease_for_change(session, change["client_ref"])
+    if lease is None:
+        logger.info("compliance poll: skipping change for %s", change["client_ref"])
+        return None
+    audit_id = uuid.UUID(change["new_audit_id"])
+    existing = (
+        await session.execute(select(LeaseAudit).where(LeaseAudit.audit_id == audit_id))
+    ).first()
+    if existing is not None:
+        return None
+    body = await get_audit(change["new_audit_id"])
+    session.add(
+        LeaseAudit(
+            lease_id=lease.id,
+            organization_id=lease.organization_id,
+            audit_id=audit_id,
+            as_at=date.fromisoformat(body["as_at"]),
+            findings=body["findings"],
+        )
+    )
+    delta = _delta_lines(change["changes"])
+    body_text = (
+        f"The lease for {lease.tenant_name} changed under updated law or rules: "
+        f"{delta}. General information, not legal advice."
+    )
+    await notify_users(
+        session,
+        await manager_user_ids(session, lease.organization_id),
+        lease.organization_id,
+        "compliance",
+        "Lease compliance status changed",
+        body_text,
+        f"/app/leases/{lease.id}",
+    )
+    subject = f"Lease compliance status changed - {lease.tenant_name}"
+    html = f"<p>{body_text}</p>"
+    return [
+        (email, subject, html) for email in await manager_emails(session, lease.organization_id)
+    ]
+
+
 async def poll_audit_changes(session: AsyncSession) -> int:
-    """Apply the service's audit-changes feed: store new audits and notify."""
+    """Apply the service's audit-changes feed: store new audits and notify.
+
+    Each change commits (rows plus cursor) before its emails go out, so a
+    failure never unsends an email. A failed change stops the run without
+    advancing the cursor past it; the next run retries from there.
+    """
     state = await _cursor(session)
-    since = state.value if state else None
     applied = 0
     while True:
-        batch = await list_changes(since)
+        since = state.value if state else None
+        batch = await list_changes(since, PAGE_LIMIT)
         for change in batch:
-            since = change["created_at"]
-            lease = await _lease_for_change(session, change["client_ref"])
-            if lease is None:
-                logger.info("compliance poll: skipping change for %s", change["client_ref"])
-                continue
-            audit_id = uuid.UUID(change["new_audit_id"])
-            existing = (
-                await session.execute(select(LeaseAudit).where(LeaseAudit.audit_id == audit_id))
-            ).first()
-            if existing is not None:
-                continue
-            body = await get_audit(change["new_audit_id"])
-            session.add(
-                LeaseAudit(
-                    lease_id=lease.id,
-                    organization_id=lease.organization_id,
-                    audit_id=audit_id,
-                    as_at=date.fromisoformat(body["as_at"]),
-                    findings=body["findings"],
+            try:
+                emails = await _apply_change(session, change)
+            except Exception:  # noqa: BLE001 - keep committed changes; retry next run
+                logger.exception(
+                    "compliance poll: failed on change %s; retrying next run", change["id"]
                 )
-            )
-            delta = _delta_lines(change["changes"])
-            body_text = (
-                f"The lease for {lease.tenant_name} changed under updated law or rules: "
-                f"{delta}. General information, not legal advice."
-            )
-            await notify_users(
-                session,
-                await manager_user_ids(session, lease.organization_id),
-                lease.organization_id,
-                "compliance",
-                "Lease compliance status changed",
-                body_text,
-                f"/app/leases/{lease.id}",
-            )
-            subject = f"Lease compliance status changed - {lease.tenant_name}"
-            html = f"<p>{body_text}</p>"
-            for email in await manager_emails(session, lease.organization_id):
-                await safe_send(email, subject, html)
-            applied += 1
-        if len(batch) < 100:
+                await session.rollback()
+                return applied
+            if state is None:
+                state = ComplianceSyncState(key=CURSOR_KEY, value=change["created_at"])
+                session.add(state)
+            else:
+                state.value = change["created_at"]
+            await session.commit()
+            if emails is not None:
+                applied += 1
+                for to, subject, html in emails:
+                    await safe_send(to, subject, html)
+        if len(batch) < PAGE_LIMIT:
             break
-    if since is not None:
-        if state is None:
-            session.add(ComplianceSyncState(key=CURSOR_KEY, value=since))
-        else:
-            state.value = since
-    await session.commit()
     return applied

@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -143,6 +143,54 @@ async def test_poll_rerun_is_idempotent(client, db_session, compliance_on, fake_
     fake_feed(lease["id"], new_audit_id=audit_id)
     assert await poll_audit_changes(db_session) == 0
     assert len((await db_session.execute(select(LeaseAudit))).scalars().all()) == 1
+
+
+async def test_poll_failure_isolates_committed_changes(
+    client, db_session, compliance_on, monkeypatch
+):
+    """A mid-run failure keeps earlier changes committed and emailed, sends
+    nothing for the failed change, and leaves the cursor before it."""
+    headers = await landlord_headers(client)
+    lease_a = await _make_lease(client, headers)
+    lease_b = await _make_lease(client, headers)
+    good_id = str(uuid.uuid4())
+    bad_id = str(uuid.uuid4())
+    t1 = datetime.now(UTC).isoformat()
+    t2 = (datetime.now(UTC) + timedelta(seconds=1)).isoformat()
+    calls = {"count": 0}
+
+    async def _changes(since, limit=100):
+        calls["count"] += 1
+        if calls["count"] > 1:
+            return []
+        return [_change(lease_a["id"], good_id, t1), _change(lease_b["id"], bad_id, t2)]
+
+    async def _get(audit_id):
+        if audit_id == bad_id:
+            raise RuntimeError("service hiccup")
+        body = dict(FAKE_AUDIT)
+        body["id"] = audit_id
+        return body
+
+    sent = []
+
+    async def _send(to, subject, html):
+        sent.append(to)
+
+    monkeypatch.setattr("app.services.compliance.list_changes", _changes)
+    monkeypatch.setattr("app.services.compliance.get_audit", _get)
+    monkeypatch.setattr("app.services.compliance.safe_send", _send)
+
+    assert await poll_audit_changes(db_session) == 1
+    stored = (await db_session.execute(select(LeaseAudit))).scalars().all()
+    assert [str(row.audit_id) for row in stored] == [good_id]
+    assert len(sent) == 1
+    cursor = (
+        await db_session.execute(
+            select(ComplianceSyncState).where(ComplianceSyncState.key == "audit_changes_cursor")
+        )
+    ).scalar_one()
+    assert cursor.value == t1
 
 
 async def test_backfill_enqueues_only_active_unaudited(
