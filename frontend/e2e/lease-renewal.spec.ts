@@ -28,7 +28,7 @@ test("a landlord renews a lease and the two are linked", async ({ page }) => {
   await page.getByLabel("Property").selectOption({ label: "3 Renewal Road (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Rita Renewal");
   await page.getByPlaceholder("Tenant email").fill(`tenant-${stamp}@example.com`);
-  await page.getByLabel("Rent").fill("500");
+  await page.getByLabel("Rent", { exact: true }).fill("500");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(20));
   await page.getByRole("button", { name: "Add lease" }).click();
@@ -44,10 +44,10 @@ test("a landlord renews a lease and the two are linked", async ({ page }) => {
   // a JSON string, so it is not the "500" that was typed in.
   await expect(page.getByText("Rita Renewal")).toBeVisible();
   await expect(page.getByLabel("Start")).toHaveValue(isoDate(21));
-  await expect(page.getByLabel("Rent")).toHaveValue("500.00");
+  await expect(page.getByLabel("Rent", { exact: true })).toHaveValue("500.00");
   await expect(page.getByLabel("End")).toHaveValue("");
 
-  await page.getByLabel("Rent").fill("550");
+  await page.getByLabel("Rent", { exact: true }).fill("550");
   await page.getByLabel("End").fill(isoDate(385));
   await page.getByRole("button", { name: "Create renewal" }).click();
 

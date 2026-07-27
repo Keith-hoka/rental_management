@@ -28,14 +28,14 @@ const RULE_LABELS: Record<string, string> = {
   "nsw.break_fee_cap": "Break fee cap (s107)",
 };
 
-const NOT_RECORDED = "not recorded in this app";
+const NOT_FILLED = "not filled in for this lease";
 
 const FIELD_HINTS: Record<string, string> = {
   bond_amount: "the bond amount",
-  rent_in_advance_amount: `the advance rent amount (${NOT_RECORDED})`,
-  holding_deposit_amount: `the holding fee amount (${NOT_RECORDED})`,
-  other_security_amount: `the other-security amount (${NOT_RECORDED})`,
-  break_fee_amount: `the break fee amount (${NOT_RECORDED})`,
+  rent_in_advance_amount: `the advance rent amount (${NOT_FILLED})`,
+  holding_deposit_amount: `the holding fee amount (${NOT_FILLED})`,
+  other_security_amount: `the other-security amount (${NOT_FILLED})`,
+  break_fee_amount: `the break fee amount (${NOT_FILLED})`,
   rent_increases: "a rent increase history, which builds from renewals with a higher rent",
   end_date: "the end date",
 };

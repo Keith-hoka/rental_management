@@ -208,6 +208,10 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
       rent_amount: current.rent_amount,
       rent_frequency: current.rent_frequency,
       bond_amount: current.bond_amount,
+      rent_in_advance_amount: current.rent_in_advance_amount,
+      holding_deposit_amount: current.holding_deposit_amount,
+      other_security_amount: current.other_security_amount,
+      break_fee_amount: current.break_fee_amount,
       notice_period_days: current.notice_period_days,
       start_date: current.start_date,
       end_date: current.end_date,
@@ -427,6 +431,30 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
               />
             </label>
           </div>
+          <p className="text-sm font-medium text-text">Upfront money &amp; fees (optional)</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["rent_in_advance_amount", "Rent in advance"],
+                ["holding_deposit_amount", "Holding fee"],
+                ["other_security_amount", "Other security"],
+                ["break_fee_amount", "Break fee"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="text-sm text-muted">
+                {label}
+                <Input
+                  type="number"
+                  min={0}
+                  value={form[key] ?? ""}
+                  onChange={(e) =>
+                    set(key, e.target.value === "" ? null : Number(e.target.value))
+                  }
+                  className="mt-1"
+                />
+              </label>
+            ))}
+          </div>
           <div className="flex gap-2">
             <label className="flex-1 text-sm text-muted">
               Start
@@ -491,6 +519,26 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
             <Field
               label="Bond"
               value={lease.bond_amount != null ? `$${lease.bond_amount}` : "—"}
+            />
+            <Field
+              label="Rent in advance"
+              value={
+                lease.rent_in_advance_amount != null ? `$${lease.rent_in_advance_amount}` : "—"
+              }
+            />
+            <Field
+              label="Holding fee"
+              value={
+                lease.holding_deposit_amount != null ? `$${lease.holding_deposit_amount}` : "—"
+              }
+            />
+            <Field
+              label="Other security"
+              value={lease.other_security_amount != null ? `$${lease.other_security_amount}` : "—"}
+            />
+            <Field
+              label="Break fee"
+              value={lease.break_fee_amount != null ? `$${lease.break_fee_amount}` : "—"}
             />
             <Field
               label="Notice period"

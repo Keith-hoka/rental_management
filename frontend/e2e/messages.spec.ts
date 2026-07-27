@@ -43,7 +43,7 @@ test("landlord deletes a message after confirming", async ({ page }) => {
   await page.getByLabel("Property").selectOption({ label: "2 Message Mews (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Msg Tenant");
   await page.getByPlaceholder("Tenant email").fill(`msg-t-${Date.now()}@example.com`);
-  await page.getByLabel("Rent").fill("300");
+  await page.getByLabel("Rent", { exact: true }).fill("300");
   await page.getByLabel("Start").fill(iso(-1));
   await page.getByLabel("End").fill(iso(30));
   await page.getByRole("button", { name: "Add lease" }).click();

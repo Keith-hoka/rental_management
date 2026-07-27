@@ -40,7 +40,7 @@ test("adding a lease from the leases page makes a property occupied, deleting it
   await page.getByLabel("Co-tenant 1 name").fill("Coco Tenant");
   await page.getByLabel("Co-tenant 1 email").fill("coco@example.com");
   await page.getByLabel("Co-tenant 1 phone").fill("555-2000");
-  await page.getByLabel("Rent").fill("1500");
+  await page.getByLabel("Rent", { exact: true }).fill("1500");
   await page.getByLabel("Bond (optional)").fill("3000");
   await page.getByLabel("Notice period (days)").fill("21");
   await page.getByLabel("Start").fill(isoDate(-1));
@@ -103,7 +103,7 @@ test("leases are reachable from the dashboard and a property's detail page", asy
   await page.getByLabel("Property").selectOption({ label: "9 Overview Ave (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Nav Tenant");
   await page.getByPlaceholder("Tenant email").fill("nav@example.com");
-  await page.getByLabel("Rent").fill("1200");
+  await page.getByLabel("Rent", { exact: true }).fill("1200");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(20));
   await page.getByRole("button", { name: "Add lease" }).click();

@@ -27,7 +27,7 @@ async function openLeaseDetail(page: import("@playwright/test").Page): Promise<v
   await page.getByLabel("Property").selectOption({ label: "21 Compliance Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Cora Compliance");
   await page.getByPlaceholder("Tenant email").fill(`tenant-${Date.now()}@example.com`);
-  await page.getByLabel("Rent").fill("600");
+  await page.getByLabel("Rent", { exact: true }).fill("600");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(364));
   await page.getByRole("button", { name: "Add lease" }).click();
@@ -51,7 +51,7 @@ test("check now renders findings and the disclaimer", async ({ page }) => {
   await page.getByRole("button", { name: "Check now" }).click();
   await expect(page.getByText("compliant")).toBeVisible();
   await expect(page.getByText("Bond cap (s159)")).toBeVisible();
-  await expect(page.getByText("not recorded in this app").first()).toBeVisible();
+  await expect(page.getByText("not filled in for this lease").first()).toBeVisible();
   await expect(page.getByText("s42 was repealed on 13 Dec 2024")).toBeVisible();
   await expect(page.getByText("General information, not legal advice.")).toBeVisible();
 });

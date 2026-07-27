@@ -46,7 +46,7 @@ test("a landlord uploads, versions, previews and deletes a document", async ({ p
   await page.getByLabel("Property").selectOption({ label: "13 Docs Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Dana Docs");
   await page.getByPlaceholder("Tenant email").fill(`tenant-${Date.now()}@example.com`);
-  await page.getByLabel("Rent").fill("600");
+  await page.getByLabel("Rent", { exact: true }).fill("600");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(60));
   await page.getByRole("button", { name: "Add lease" }).click();

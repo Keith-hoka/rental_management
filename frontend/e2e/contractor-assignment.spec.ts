@@ -39,7 +39,7 @@ test("a landlord assigns a contractor and the tenant sees who is coming", async 
   await page.getByLabel("Property").selectOption({ label: "7 Contractor Close (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Tess Tenant");
   await page.getByPlaceholder("Tenant email").fill(tenant);
-  await page.getByLabel("Rent").fill("400");
+  await page.getByLabel("Rent", { exact: true }).fill("400");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(60));
   await page.getByRole("button", { name: "Add lease" }).click();

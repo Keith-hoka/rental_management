@@ -27,6 +27,10 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
   const [rent, setRent] = useState(0);
   const [frequency, setFrequency] = useState<LeaseFrequency>("monthly");
   const [bond, setBond] = useState<number | null>(null);
+  const [advance, setAdvance] = useState<number | null>(null);
+  const [holdingFee, setHoldingFee] = useState<number | null>(null);
+  const [otherSecurity, setOtherSecurity] = useState<number | null>(null);
+  const [breakFee, setBreakFee] = useState<number | null>(null);
   const [noticeDays, setNoticeDays] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +45,10 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
         setRent(l.rent_amount);
         setFrequency(l.rent_frequency);
         setBond(l.bond_amount);
+        setAdvance(l.rent_in_advance_amount);
+        setHoldingFee(l.holding_deposit_amount);
+        setOtherSecurity(l.other_security_amount);
+        setBreakFee(l.break_fee_amount);
         setNoticeDays(l.notice_period_days);
       })
       .catch(() => active && setError("Lease not found"));
@@ -59,6 +67,10 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
         rent_amount: rent,
         rent_frequency: frequency,
         bond_amount: bond,
+        rent_in_advance_amount: advance,
+        holding_deposit_amount: holdingFee,
+        other_security_amount: otherSecurity,
+        break_fee_amount: breakFee,
         notice_period_days: noticeDays,
       });
       router.push(`/app/leases/${renewal.id}`);
@@ -147,6 +159,28 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
                 />
               </Field>
             </div>
+          </div>
+          <p className="text-sm font-medium text-text">Upfront money &amp; fees (optional)</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["Rent in advance", advance, setAdvance],
+                ["Holding fee", holdingFee, setHoldingFee],
+                ["Other security", otherSecurity, setOtherSecurity],
+                ["Break fee", breakFee, setBreakFee],
+              ] as const
+            ).map(([label, value, setter]) => (
+              <Field key={label} label={label}>
+                <Input
+                  type="number"
+                  min={0}
+                  value={value ?? ""}
+                  onChange={(e) =>
+                    setter(e.target.value === "" ? null : Number(e.target.value))
+                  }
+                />
+              </Field>
+            ))}
           </div>
           <div className="flex gap-2">
             <div className="flex-1">

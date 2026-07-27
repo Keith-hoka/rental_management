@@ -25,7 +25,7 @@ test("landlord invites a tenant from the lease detail", async ({ page }) => {
   await page.getByLabel("Property").selectOption({ label: "5 Tenant Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Tessa Tenant");
   await page.getByPlaceholder("Tenant email").fill("tessa@example.com");
-  await page.getByLabel("Rent").fill("1400");
+  await page.getByLabel("Rent", { exact: true }).fill("1400");
   const today = new Date();
   const start = new Date(today);
   start.setDate(start.getDate() - 1);

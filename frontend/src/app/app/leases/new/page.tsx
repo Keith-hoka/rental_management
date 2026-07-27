@@ -24,11 +24,22 @@ function emptyForm(): LeaseInput {
     rent_amount: 0,
     rent_frequency: "monthly",
     bond_amount: null,
+    rent_in_advance_amount: null,
+    holding_deposit_amount: null,
+    other_security_amount: null,
+    break_fee_amount: null,
     notice_period_days: null,
     start_date: todayISO(),
     end_date: "",
   };
 }
+
+const MONEY_FIELDS = [
+  ["rent_in_advance_amount", "Rent in advance"],
+  ["holding_deposit_amount", "Holding fee"],
+  ["other_security_amount", "Other security"],
+  ["break_fee_amount", "Break fee"],
+] as const;
 
 export default function NewLeasePage() {
   const router = useRouter();
@@ -153,6 +164,21 @@ export default function NewLeasePage() {
                 />
               </Field>
             </div>
+          </div>
+          <p className="text-sm font-medium text-text">Upfront money &amp; fees (optional)</p>
+          <div className="grid grid-cols-2 gap-2">
+            {MONEY_FIELDS.map(([key, label]) => (
+              <Field key={key} label={label}>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form[key] ?? ""}
+                  onChange={(e) =>
+                    set(key, e.target.value === "" ? null : Number(e.target.value))
+                  }
+                />
+              </Field>
+            ))}
           </div>
           <div className="flex gap-2">
             <div className="flex-1">

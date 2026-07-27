@@ -31,7 +31,7 @@ test("a tenant accepts an invite and uses the portal", async ({ page }) => {
   await page.getByLabel("Property").selectOption({ label: "8 Portal Street (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Portal Tenant");
   await page.getByPlaceholder("Tenant email").fill(tenant);
-  await page.getByLabel("Rent").fill("600");
+  await page.getByLabel("Rent", { exact: true }).fill("600");
   // Set explicitly so the assertion below does not ride on the form default.
   await page.getByLabel("Frequency").selectOption("weekly");
   await page.getByLabel("Start").fill(isoDate(-1));

@@ -31,7 +31,7 @@ test("a manager sees derived entries and manages a custom event", async ({ page 
   await page.getByLabel("Property").selectOption({ label: "8 Cal Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Cara Cal");
   await page.getByPlaceholder("Tenant email").fill(`cal-t-${Date.now()}@example.com`);
-  await page.getByLabel("Rent").fill("500");
+  await page.getByLabel("Rent", { exact: true }).fill("500");
   await page.getByLabel("Start").fill(`${ym}-01`);
   await page.getByLabel("End").fill(`${ym}-28`);
   await page.getByRole("button", { name: "Add lease" }).click();

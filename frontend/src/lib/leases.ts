@@ -18,6 +18,10 @@ export interface Lease {
   rent_amount: number;
   rent_frequency: LeaseFrequency;
   bond_amount: number | null;
+  rent_in_advance_amount: number | null;
+  holding_deposit_amount: number | null;
+  other_security_amount: number | null;
+  break_fee_amount: number | null;
   notice_period_days: number | null;
   start_date: string;
   end_date: string;
@@ -35,6 +39,10 @@ export interface LeaseInput {
   rent_amount: number;
   rent_frequency: LeaseFrequency;
   bond_amount: number | null;
+  rent_in_advance_amount: number | null;
+  holding_deposit_amount: number | null;
+  other_security_amount: number | null;
+  break_fee_amount: number | null;
   notice_period_days: number | null;
   start_date: string;
   end_date: string;
@@ -46,6 +54,10 @@ export interface LeaseRenewInput {
   rent_amount?: number;
   rent_frequency?: LeaseFrequency;
   bond_amount?: number | null;
+  rent_in_advance_amount?: number | null;
+  holding_deposit_amount?: number | null;
+  other_security_amount?: number | null;
+  break_fee_amount?: number | null;
   notice_period_days?: number | null;
 }
 

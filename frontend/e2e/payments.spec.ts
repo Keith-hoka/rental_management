@@ -23,7 +23,7 @@ test("landlord records a payment on a lease", async ({ page }) => {
   await page.getByLabel("Property").selectOption({ label: "9 Pay Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Pat Payer");
   await page.getByPlaceholder("Tenant email").fill("pat@example.com");
-  await page.getByLabel("Rent").fill("1200");
+  await page.getByLabel("Rent", { exact: true }).fill("1200");
   const today = new Date();
   const start = new Date(today);
   start.setDate(start.getDate() - 1);

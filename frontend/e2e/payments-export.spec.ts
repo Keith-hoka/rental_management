@@ -32,7 +32,7 @@ test("a landlord exports the payment history as CSV", async ({ page }) => {
   await page.getByLabel("Property").selectOption({ label: "6 Export Way (vacant)" });
   await page.getByPlaceholder("Tenant name").fill("Ed Exporter");
   await page.getByPlaceholder("Tenant email").fill(`tenant-${Date.now()}@example.com`);
-  await page.getByLabel("Rent").fill("700");
+  await page.getByLabel("Rent", { exact: true }).fill("700");
   await page.getByLabel("Start").fill(isoDate(-1));
   await page.getByLabel("End").fill(isoDate(60));
   await page.getByRole("button", { name: "Add lease" }).click();
