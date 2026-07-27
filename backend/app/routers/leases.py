@@ -24,6 +24,8 @@ from app.models import (
 )
 from app.routers.properties import get_owned_property
 from app.schemas.charge import ChargeInfo
+from app.services.compliance import enabled as compliance_enabled
+from app.services.compliance import enqueue_audit
 from app.services.invites import reject_duplicate_invite
 from app.services.notify import lease_tenant_user_ids, manager_user_ids, notify_users
 from app.services.payments import lease_statuses
@@ -78,6 +80,9 @@ async def create_lease(
         organization_id=prop.organization_id, property_id=property_id, **body.model_dump()
     )
     session.add(lease)
+    await session.flush()
+    if compliance_enabled():
+        await enqueue_audit(session, lease.id)
     await session.commit()
     await session.refresh(lease)
     return lease
@@ -166,6 +171,8 @@ async def renew_lease(
         f"/app/leases/{renewal.id}",
     )
 
+    if compliance_enabled():
+        await enqueue_audit(session, renewal.id)
     await session.commit()
     await session.refresh(renewal)
     return renewal

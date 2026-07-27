@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.scheduler import scheduler, start_scheduler
 from app.routers.auth import router as auth_router
 from app.routers.calendar import router as calendar_router
+from app.routers.compliance import router as compliance_router
 from app.routers.contractors import router as contractors_router
 from app.routers.documents import router as documents_router
 from app.routers.expenses import router as expenses_router
@@ -48,6 +49,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(calendar_router)
+app.include_router(compliance_router)
 app.include_router(contractors_router)
 app.include_router(documents_router)
 app.include_router(expenses_router)

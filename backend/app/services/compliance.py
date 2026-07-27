@@ -1,13 +1,16 @@
 """Client, mapper and jobs for the lease-compliance-service integration."""
 
+import uuid
+from datetime import date
 from itertools import pairwise
 
 import httpx
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import Lease
+from app.models import ComplianceAuditQueue, Lease, LeaseAudit
 
 TIMEOUT = 10.0
 
@@ -94,3 +97,29 @@ def chain_to_audit_payload(chain: list[Lease]) -> dict:
     if increases:
         lease_body["rent_increases"] = increases
     return {"jurisdiction": "NSW", "client_ref": str(newest.id), "lease": lease_body}
+
+
+async def run_lease_audit(session: AsyncSession, lease: Lease) -> LeaseAudit:
+    """Audit one lease now and store the result. The caller commits."""
+    chain = await load_chain(session, lease)
+    body = await create_audit(chain_to_audit_payload(chain))
+    audit = LeaseAudit(
+        lease_id=lease.id,
+        organization_id=lease.organization_id,
+        audit_id=uuid.UUID(body["id"]),
+        as_at=date.fromisoformat(body["as_at"]),
+        findings=body["findings"],
+    )
+    session.add(audit)
+    await session.flush()
+    return audit
+
+
+async def enqueue_audit(session: AsyncSession, lease_id) -> None:
+    """Queue a lease for auditing; a pending duplicate is a no-op."""
+    statement = (
+        pg_insert(ComplianceAuditQueue)
+        .values(lease_id=lease_id)
+        .on_conflict_do_nothing(index_elements=["lease_id"])
+    )
+    await session.execute(statement)
