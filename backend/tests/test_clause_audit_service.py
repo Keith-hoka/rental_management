@@ -14,6 +14,7 @@ from app.models import (
     LeaseClauseAudit,
     LeaseFrequency,
     Membership,
+    Notification,
     User,
 )
 from app.services import clause_audit
@@ -174,3 +175,141 @@ async def test_submit_document_audit_posts_latest_version(
         )
     ).scalar_one()
     assert row.document_version_id == version_2
+
+
+def _terminal_job(job_id, status="succeeded", findings=None, discrepancies=None, error=None):
+    body = dict(FAKE_JOB)
+    body.update(
+        id=job_id,
+        status=status,
+        findings=findings or [],
+        discrepancies=discrepancies or [],
+        error=error,
+        completed_at="2026-07-28T01:00:00Z",
+    )
+    return body
+
+
+RED_FINDING = {
+    "rule_id": "nsw.clause.carpet_cleaning",
+    "verdict": "red",
+    "summary": "Found",
+    "evidence": {},
+    "citations": [],
+    "skip_reason": None,
+    "clause_quote": "carpet professionally cleaned",
+}
+
+
+async def _seed_in_flight(client, db_session, email, address):
+    headers = await landlord_headers(client, email)
+    org_id, user_id = await _org_and_user(db_session, email)
+    lease_id = uuid.UUID(await make_lease(client, headers, address))
+    document = await _seed_document(db_session, org_id, lease_id, user_id)
+    version_id = (
+        await db_session.execute(
+            select(DocumentVersion.id).where(DocumentVersion.document_id == document.id)
+        )
+    ).scalar_one()
+    row = LeaseClauseAudit(
+        organization_id=org_id,
+        lease_id=lease_id,
+        document_id=document.id,
+        document_version_id=version_id,
+        job_id=str(uuid.uuid4()),
+        status="pending",
+        model="claude-opus-4-8",
+        engine_version="1.1.1",
+    )
+    db_session.add(row)
+    await db_session.commit()
+    return row
+
+
+async def test_poll_writes_results_and_notifies(client, db_session, monkeypatch):
+    row = await _seed_in_flight(client, db_session, "clausepoll@example.com", "3 Poll St")
+
+    async def fake_get(job_id):
+        return _terminal_job(
+            job_id,
+            findings=[RED_FINDING],
+            discrepancies=[
+                {"field": "rent_amount", "document_value": "$520", "submitted_value": "560"}
+            ],
+        )
+
+    sent = []
+
+    async def fake_send(to, subject, html):
+        sent.append((to, subject))
+
+    monkeypatch.setattr("app.services.clause_audit.get_clause_audit", fake_get)
+    monkeypatch.setattr("app.services.clause_audit.safe_send", fake_send)
+
+    updated = await clause_audit.poll_clause_audits(db_session)
+
+    assert updated == 1
+    await db_session.refresh(row)
+    assert row.status == "succeeded"
+    assert row.findings[0]["verdict"] == "red"
+    assert row.discrepancies[0]["field"] == "rent_amount"
+    assert row.completed_at is not None
+    notifications = (
+        (
+            await db_session.execute(
+                select(Notification).where(Notification.organization_id == row.organization_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert any("1 red, 0 yellow, 1 field mismatch" in n.body for n in notifications)
+    assert sent and "Clause audit finished" in sent[0][1]
+
+
+async def test_poll_isolates_one_bad_row(client, db_session, monkeypatch):
+    bad = await _seed_in_flight(client, db_session, "clausebad@example.com", "4 Bad St")
+    good = await _seed_in_flight(client, db_session, "clausegood@example.com", "5 Good St")
+    bad_job_id = bad.job_id
+
+    async def fake_get(job_id):
+        if job_id == bad_job_id:
+            raise RuntimeError("service hiccup")
+        return _terminal_job(job_id)
+
+    async def fake_send(to, subject, html):
+        pass
+
+    monkeypatch.setattr("app.services.clause_audit.get_clause_audit", fake_get)
+    monkeypatch.setattr("app.services.clause_audit.safe_send", fake_send)
+
+    updated = await clause_audit.poll_clause_audits(db_session)
+
+    assert updated == 1
+    await db_session.refresh(bad)
+    await db_session.refresh(good)
+    assert bad.status == "pending"
+    assert good.status == "succeeded"
+
+
+async def test_poll_failure_status_notifies_failure(client, db_session, monkeypatch):
+    row = await _seed_in_flight(client, db_session, "clausefail@example.com", "6 Fail St")
+
+    async def fake_get(job_id):
+        return _terminal_job(job_id, status="failed", error="model declined the request")
+
+    sent = []
+
+    async def fake_send(to, subject, html):
+        sent.append(subject)
+
+    monkeypatch.setattr("app.services.clause_audit.get_clause_audit", fake_get)
+    monkeypatch.setattr("app.services.clause_audit.safe_send", fake_send)
+
+    updated = await clause_audit.poll_clause_audits(db_session)
+
+    assert updated == 1
+    await db_session.refresh(row)
+    assert row.status == "failed"
+    assert row.error == "model declined the request"
+    assert sent and "Clause audit failed" in sent[0]
