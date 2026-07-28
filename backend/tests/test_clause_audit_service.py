@@ -153,8 +153,9 @@ async def test_submit_document_audit_posts_latest_version(
 
     monkeypatch.setattr("app.services.clause_audit.create_clause_audit", fake_create)
     lease = (await db_session.execute(select(Lease).where(Lease.id == lease_id))).scalar_one()
+    version = await clause_audit.latest_version(db_session, document.id)
 
-    row = await clause_audit.submit_document_audit(db_session, lease, document)
+    row = await clause_audit.submit_document_audit(db_session, lease, document, version)
     await db_session.commit()
 
     assert captured["filename"] == "lease-v2.pdf"
@@ -290,6 +291,35 @@ async def test_poll_isolates_one_bad_row(client, db_session, monkeypatch):
     await db_session.refresh(good)
     assert bad.status == "pending"
     assert good.status == "succeeded"
+
+
+async def test_poll_fails_out_stale_rows_without_calling_the_service(
+    client, db_session, monkeypatch
+):
+    from datetime import UTC, datetime, timedelta
+
+    row = await _seed_in_flight(client, db_session, "clausestale@example.com", "7 Stale St")
+    row.created_at = datetime.now(UTC) - timedelta(hours=7)
+    await db_session.commit()
+
+    async def fake_get(job_id):
+        raise AssertionError("stale rows must not be polled")
+
+    sent = []
+
+    async def fake_send(to, subject, html):
+        sent.append(subject)
+
+    monkeypatch.setattr("app.services.clause_audit.get_clause_audit", fake_get)
+    monkeypatch.setattr("app.services.clause_audit.safe_send", fake_send)
+
+    updated = await clause_audit.poll_clause_audits(db_session)
+
+    assert updated == 1
+    await db_session.refresh(row)
+    assert row.status == "failed"
+    assert "timed out" in row.error
+    assert sent and "Clause audit failed" in sent[0]
 
 
 async def test_poll_failure_status_notifies_failure(client, db_session, monkeypatch):

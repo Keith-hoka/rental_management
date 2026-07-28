@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.models import DocumentCategory, DocumentVersion, LeaseClauseAudit
 from tests.test_clause_audit_service import FAKE_JOB, _org_and_user, _seed_document
-from tests.test_portal import make_lease
+from tests.test_portal import make_lease, onboard_tenant
 from tests.test_properties_crud import landlord_headers
 
 
@@ -131,6 +131,49 @@ async def test_post_service_429_passes_through(
         f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=headers
     )
     assert response.status_code == 429
+
+
+async def test_tenant_role_is_403(client, db_session, tmp_path, monkeypatch, compliance_on):
+    headers, lease_id, document = await _setup(
+        client, db_session, "cl403@example.com", "18 Role St", tmp_path, monkeypatch
+    )
+    tenant = await onboard_tenant(client, db_session, headers, lease_id, "cl403-t@example.com")
+    posted = await client.post(
+        f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=tenant
+    )
+    listed = await client.get(f"/api/v1/leases/{lease_id}/clause-audits", headers=tenant)
+    assert posted.status_code == 403 and listed.status_code == 403
+
+
+async def test_missing_file_on_disk_is_409(
+    client, db_session, tmp_path, monkeypatch, compliance_on
+):
+    headers, lease_id, document = await _setup(
+        client, db_session, "clnofile@example.com", "19 Gone St", tmp_path, monkeypatch
+    )
+    Path(tmp_path, "stored.pdf").unlink()
+    response = await client.post(
+        f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=headers
+    )
+    assert response.status_code == 409
+    assert "missing" in response.json()["detail"]
+
+
+async def test_service_413_maps_to_413(client, db_session, tmp_path, monkeypatch, compliance_on):
+    headers, lease_id, document = await _setup(
+        client, db_session, "cl413@example.com", "20 Big St", tmp_path, monkeypatch
+    )
+
+    async def _too_big(filename, content, content_type, payload):
+        request = httpx.Request("POST", "http://service/v1/clause-audits")
+        response = httpx.Response(413, request=request)
+        raise httpx.HTTPStatusError("too large", request=request, response=response)
+
+    monkeypatch.setattr("app.services.clause_audit.create_clause_audit", _too_big)
+    response = await client.post(
+        f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=headers
+    )
+    assert response.status_code == 413
 
 
 async def test_list_shape_and_scoping(client, db_session, tmp_path, monkeypatch, compliance_on):

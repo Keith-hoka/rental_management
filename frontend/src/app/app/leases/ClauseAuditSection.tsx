@@ -9,7 +9,7 @@ import {
   type ClauseFinding,
   type ClauseVerdict,
 } from "@/lib/clauseAudit";
-import { listLeaseDocuments, type DocumentInfo } from "@/lib/documents";
+import type { DocumentInfo } from "@/lib/documents";
 
 const VERDICT_TONE: Record<ClauseVerdict, "danger" | "success" | "warning" | "neutral"> = {
   red: "danger",
@@ -57,7 +57,13 @@ function label(finding: ClauseFinding): string {
 
 function StatusChip({ audit }: { audit: ClauseAudit }) {
   if (audit.status === "pending") return <Badge tone="neutral">Queued</Badge>;
-  if (audit.status === "running") return <Badge tone="brand">Running...</Badge>;
+  if (audit.status === "running") {
+    return (
+      <Badge tone="brand">
+        <span className="animate-pulse">Running...</span>
+      </Badge>
+    );
+  }
   if (audit.status === "failed") return <Badge tone="danger">Failed</Badge>;
   return (
     <Badge tone="success">
@@ -137,17 +143,20 @@ function ResultPanel({ audit }: { audit: ClauseAudit }) {
   );
 }
 
-export function ClauseAuditSection({ leaseId }: { leaseId: string }) {
-  const [documents, setDocuments] = useState<DocumentInfo[]>([]);
+export function ClauseAuditSection({
+  leaseId,
+  documents,
+}: {
+  leaseId: string;
+  documents: DocumentInfo[];
+}) {
   const [state, setState] = useState<{ enabled: boolean; audits: ClauseAudit[] } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const leaseDocuments = documents.filter((d) => d.category === "lease");
 
   const load = useCallback(() => {
-    Promise.all([listLeaseDocuments(leaseId), listClauseAudits(leaseId)])
-      .then(([docs, audits]) => {
-        setDocuments(docs.filter((d) => d.category === "lease"));
-        setState(audits);
-      })
+    listClauseAudits(leaseId)
+      .then(setState)
       .catch(() => setState(null));
   }, [leaseId]);
 
@@ -165,7 +174,7 @@ export function ClauseAuditSection({ leaseId }: { leaseId: string }) {
     return () => clearInterval(timer);
   }, [inFlight, load]);
 
-  if (!state?.enabled || documents.length === 0) return null;
+  if (!state?.enabled || leaseDocuments.length === 0) return null;
 
   const byDocument = new Map<string, ClauseAudit[]>();
   for (const audit of state.audits) {
@@ -188,7 +197,7 @@ export function ClauseAuditSection({ leaseId }: { leaseId: string }) {
   return (
     <Card className="mt-5" title="Clause audit">
       <div className="space-y-4">
-        {documents.map((document) => {
+        {leaseDocuments.map((document) => {
           const audits = byDocument.get(document.id) ?? [];
           const latest = audits[0];
           const latestDone = audits.find((a) => a.status === "succeeded");
@@ -217,7 +226,19 @@ export function ClauseAuditSection({ leaseId }: { leaseId: string }) {
               {latest?.status === "failed" && latest.error ? (
                 <p className="text-xs text-danger-fg">{latest.error}</p>
               ) : null}
-              {latestDone ? <ResultPanel audit={latestDone} /> : null}
+              {latestDone ? (
+                <>
+                  {(() => {
+                    const audited = document.versions.find(
+                      (v) => v.id === latestDone.document_version_id,
+                    );
+                    return audited ? (
+                      <p className="text-xs text-muted">Audited version: v{audited.version_number}</p>
+                    ) : null;
+                  })()}
+                  <ResultPanel audit={latestDone} />
+                </>
+              ) : null}
               {older.length > 0 ? (
                 <p className="text-xs text-muted">
                   Previous audits:{" "}

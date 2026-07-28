@@ -827,7 +827,7 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
 
           <ComplianceSection leaseId={leaseId} />
 
-          <ClauseAuditSection leaseId={leaseId} />
+          <ClauseAuditSection leaseId={leaseId} documents={documents} />
         </>
       )}
 

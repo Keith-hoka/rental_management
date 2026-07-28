@@ -77,11 +77,19 @@ async def run_clause_audit(
     if in_flight is not None:
         raise HTTPException(status_code=409, detail="A clause audit is already in flight")
     try:
-        row = await clause_audit.submit_document_audit(session, lease, document)
+        row = await clause_audit.submit_document_audit(session, lease, document, version)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=409, detail="The document file is missing from storage"
+        ) from exc
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 429:
             raise HTTPException(
                 status_code=429, detail="Clause audit queue is full, try again later"
+            ) from exc
+        if exc.response.status_code == 413:
+            raise HTTPException(
+                status_code=413, detail="The document exceeds the service's 10 MB limit"
             ) from exc
         logger.warning("Clause audit submit failed for document %s: %s", document_id, exc)
         raise HTTPException(status_code=502, detail="Compliance service unavailable") from exc

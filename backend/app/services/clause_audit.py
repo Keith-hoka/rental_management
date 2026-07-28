@@ -2,7 +2,8 @@
 
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from html import escape
 from pathlib import Path
 
 import httpx
@@ -16,7 +17,9 @@ from app.services.notify import manager_emails, manager_user_ids, notify_users, 
 logger = logging.getLogger(__name__)
 
 UPLOAD_TIMEOUT = 30.0
+STATUS_TIMEOUT = 10.0
 IN_FLIGHT = ("pending", "running")
+MAX_IN_FLIGHT_AGE = timedelta(hours=6)
 
 MONEY_FIELDS = (
     "bond_amount",
@@ -48,7 +51,7 @@ async def create_clause_audit(
 
 async def get_clause_audit(job_id: str) -> dict:
     """Fetch one clause-audit job by the service's job id."""
-    async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=STATUS_TIMEOUT) as client:
         response = await client.get(
             f"{settings.compliance_api_url}/v1/clause-audits/{job_id}", headers=_headers()
         )
@@ -83,10 +86,9 @@ async def latest_version(session: AsyncSession, document_id) -> DocumentVersion 
 
 
 async def submit_document_audit(
-    session: AsyncSession, lease: Lease, document: Document
+    session: AsyncSession, lease: Lease, document: Document, version: DocumentVersion
 ) -> LeaseClauseAudit:
-    """Send the document's latest version for a clause audit. The caller commits."""
-    version = await latest_version(session, document.id)
+    """Send the given (validated) document version for a clause audit. The caller commits."""
     content = Path(settings.documents_dir, version.stored_name).read_bytes()
     payload = {
         "jurisdiction": "NSW",
@@ -141,7 +143,7 @@ async def _notify_completion(session: AsyncSession, row: LeaseClauseAudit) -> li
         f"/app/leases/{lease.id}",
     )
     subject = f"{title} - {lease.tenant_name}"
-    html = f"<p>{body_text}</p>"
+    html = f"<p>{escape(body_text)}</p>"
     return [(email, subject, html) for email in await manager_emails(session, row.organization_id)]
 
 
@@ -167,6 +169,18 @@ async def poll_clause_audits(session: AsyncSession) -> int:
     for row_id in row_ids:
         try:
             row = await session.get(LeaseClauseAudit, row_id)
+            if row is None or row.status not in IN_FLIGHT:
+                continue
+            if datetime.now(UTC) - row.created_at > MAX_IN_FLIGHT_AGE:
+                row.status = "failed"
+                row.error = "timed out waiting for the compliance service"
+                row.completed_at = datetime.now(UTC)
+                emails = await _notify_completion(session, row)
+                await session.commit()
+                updated += 1
+                for to, subject, html in emails:
+                    await safe_send(to, subject, html)
+                continue
             body = await get_clause_audit(row.job_id)
             if body["status"] not in ("succeeded", "failed"):
                 if body["status"] != row.status:
