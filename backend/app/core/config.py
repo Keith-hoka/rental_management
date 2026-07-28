@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     compliance_queue_interval_minutes: int = 2
     compliance_poll_hour: int = 7
     compliance_queue_max_attempts: int = 10
+    clause_poll_interval_minutes: int = 1
 
 
 settings = Settings()

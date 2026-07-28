@@ -8,6 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.core.config import settings
 from app.core.db import SessionLocal
 from app.services.charges import generate_charges
+from app.services.clause_audit import poll_clause_audits
 from app.services.compliance import drain_audit_queue
 from app.services.compliance import enabled as compliance_enabled
 from app.services.compliance import poll_audit_changes
@@ -55,6 +56,14 @@ async def _compliance_poll_job() -> None:
     logger.info("compliance changes: applied %s", count)
 
 
+async def _clause_poll_job() -> None:
+    """Open a session and advance in-flight clause audits."""
+    async with SessionLocal() as session:
+        count = await poll_clause_audits(session)
+    if count:
+        logger.info("clause audits: completed %s", count)
+
+
 def start_scheduler() -> None:
     """Register the daily reminder and charge-generation jobs and start the scheduler."""
     scheduler.add_job(
@@ -86,6 +95,12 @@ def start_scheduler() -> None:
             _compliance_poll_job,
             CronTrigger(hour=settings.compliance_poll_hour),
             id="compliance_poll",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _clause_poll_job,
+            IntervalTrigger(minutes=settings.clause_poll_interval_minutes),
+            id="clause_poll",
             replace_existing=True,
         )
     scheduler.start()
