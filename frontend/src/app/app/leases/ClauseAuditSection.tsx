@@ -142,21 +142,17 @@ export function ClauseAuditSection({ leaseId }: { leaseId: string }) {
   const [state, setState] = useState<{ enabled: boolean; audits: ClauseAudit[] } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
-    try {
-      const [docs, audits] = await Promise.all([
-        listLeaseDocuments(leaseId),
-        listClauseAudits(leaseId),
-      ]);
-      setDocuments(docs.filter((d) => d.category === "lease"));
-      setState(audits);
-    } catch {
-      setState(null);
-    }
+  const load = useCallback(() => {
+    Promise.all([listLeaseDocuments(leaseId), listClauseAudits(leaseId)])
+      .then(([docs, audits]) => {
+        setDocuments(docs.filter((d) => d.category === "lease"));
+        setState(audits);
+      })
+      .catch(() => setState(null));
   }, [leaseId]);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   const inFlight = (state?.audits ?? []).some(
@@ -165,7 +161,7 @@ export function ClauseAuditSection({ leaseId }: { leaseId: string }) {
 
   useEffect(() => {
     if (!inFlight) return;
-    const timer = setInterval(() => void load(), 10_000);
+    const timer = setInterval(() => load(), 10_000);
     return () => clearInterval(timer);
   }, [inFlight, load]);
 
@@ -182,7 +178,7 @@ export function ClauseAuditSection({ leaseId }: { leaseId: string }) {
     setErrors((prev) => ({ ...prev, [documentId]: "" }));
     try {
       await runClauseAudit(leaseId, documentId);
-      await load();
+      load();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Clause audit failed to start";
       setErrors((prev) => ({ ...prev, [documentId]: message }));
