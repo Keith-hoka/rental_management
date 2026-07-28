@@ -35,6 +35,7 @@ import {
   type BalanceInfo,
   type PaymentMethod,
 } from "@/lib/payments";
+import { ClauseAuditSection } from "@/app/app/leases/ClauseAuditSection";
 import { ComplianceSection } from "@/app/app/leases/ComplianceSection";
 import { TenantFields } from "@/app/app/leases/TenantFields";
 import {
@@ -825,6 +826,8 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ leaseId:
           </Card>
 
           <ComplianceSection leaseId={leaseId} />
+
+          <ClauseAuditSection leaseId={leaseId} />
         </>
       )}
 
