@@ -145,7 +145,7 @@ async def test_tenant_role_is_403(client, db_session, tmp_path, monkeypatch, com
     assert posted.status_code == 403 and listed.status_code == 403
 
 
-async def test_missing_file_on_disk_is_409(
+async def test_missing_file_on_disk_is_500(
     client, db_session, tmp_path, monkeypatch, compliance_on
 ):
     headers, lease_id, document = await _setup(
@@ -155,7 +155,7 @@ async def test_missing_file_on_disk_is_409(
     response = await client.post(
         f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=headers
     )
-    assert response.status_code == 409
+    assert response.status_code == 500
     assert "missing" in response.json()["detail"]
 
 

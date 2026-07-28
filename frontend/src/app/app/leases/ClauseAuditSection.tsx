@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card } from "@/components/ui";
 import {
   listClauseAudits,
@@ -55,6 +55,17 @@ function label(finding: ClauseFinding): string {
   return CLAUSE_RULE_LABELS[finding.rule_id] ?? finding.rule_id;
 }
 
+function skippedDetail(finding: ClauseFinding): string {
+  const reason = finding.skip_reason ?? "";
+  if (reason.includes("not active")) {
+    return "Rule not in force at the audit date.";
+  }
+  if (reason.startsWith("section")) {
+    return `Statutory basis not in force at the audit date (${reason}).`;
+  }
+  return finding.summary || reason;
+}
+
 function StatusChip({ audit }: { audit: ClauseAudit }) {
   if (audit.status === "pending") return <Badge tone="neutral">Queued</Badge>;
   if (audit.status === "running") {
@@ -81,7 +92,7 @@ function FindingRow({ finding }: { finding: ClauseFinding }) {
         <span className="text-text">
           <span className="font-medium">{label(finding)}</span>
           {finding.verdict === "skipped" && finding.skip_reason
-            ? ` - ${finding.skip_reason}`
+            ? ` - ${skippedDetail(finding)}`
             : null}
         </span>
       </li>
@@ -152,12 +163,24 @@ export function ClauseAuditSection({
 }) {
   const [state, setState] = useState<{ enabled: boolean; audits: ClauseAudit[] } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const leaseDocuments = documents.filter((d) => d.category === "lease");
 
+  // A response for a previous lease must never land in this lease's state.
+  const activeLease = useRef(leaseId);
+  useEffect(() => {
+    activeLease.current = leaseId;
+  }, [leaseId]);
+
   const load = useCallback(() => {
-    listClauseAudits(leaseId)
-      .then(setState)
-      .catch(() => setState(null));
+    const requested = leaseId;
+    listClauseAudits(requested)
+      .then((next) => {
+        if (activeLease.current === requested) setState(next);
+      })
+      .catch(() => {
+        if (activeLease.current === requested) setState(null);
+      });
   }, [leaseId]);
 
   useEffect(() => {
@@ -185,12 +208,15 @@ export function ClauseAuditSection({
 
   async function run(documentId: string) {
     setErrors((prev) => ({ ...prev, [documentId]: "" }));
+    setSubmitting((prev) => ({ ...prev, [documentId]: true }));
     try {
       await runClauseAudit(leaseId, documentId);
       load();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Clause audit failed to start";
       setErrors((prev) => ({ ...prev, [documentId]: message }));
+    } finally {
+      setSubmitting((prev) => ({ ...prev, [documentId]: false }));
     }
   }
 
@@ -211,10 +237,10 @@ export function ClauseAuditSection({
                 {latest ? <StatusChip audit={latest} /> : null}
                 <Button
                   variant="secondary"
-                  disabled={!isPdf || running}
+                  disabled={!isPdf || running || submitting[document.id]}
                   onClick={() => void run(document.id)}
                 >
-                  Run clause audit
+                  {submitting[document.id] ? "Submitting..." : "Run clause audit"}
                 </Button>
               </div>
               {!isPdf ? (

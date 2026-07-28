@@ -267,6 +267,21 @@ async def test_poll_writes_results_and_notifies(client, db_session, monkeypatch)
     assert any("1 red, 0 yellow, 1 field mismatch" in n.body for n in notifications)
     assert sent and "Clause audit finished" in sent[0][1]
 
+    # A terminal row is never re-processed: no update, no second notification.
+    emails_before = len(sent)
+    assert await clause_audit.poll_clause_audits(db_session) == 0
+    recount = (
+        (
+            await db_session.execute(
+                select(Notification).where(Notification.organization_id == row.organization_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(recount) == len(notifications)
+    assert len(sent) == emails_before
+
 
 async def test_poll_isolates_one_bad_row(client, db_session, monkeypatch):
     bad = await _seed_in_flight(client, db_session, "clausebad@example.com", "4 Bad St")

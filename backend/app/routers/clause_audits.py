@@ -80,7 +80,8 @@ async def run_clause_audit(
         row = await clause_audit.submit_document_audit(session, lease, document, version)
     except FileNotFoundError as exc:
         raise HTTPException(
-            status_code=409, detail="The document file is missing from storage"
+            status_code=500,
+            detail="The document file is missing from storage; upload a new version",
         ) from exc
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 429:

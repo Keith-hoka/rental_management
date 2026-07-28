@@ -61,7 +61,7 @@ async def _clause_poll_job() -> None:
     async with SessionLocal() as session:
         count = await poll_clause_audits(session)
     if count:
-        logger.info("clause audits: completed %s", count)
+        logger.info("clause audits: %s reached a terminal state", count)
 
 
 def start_scheduler() -> None:
