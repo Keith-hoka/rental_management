@@ -1,6 +1,7 @@
 from app.models.calendar_event import CalendarEvent
 from app.models.charge import Charge
 from app.models.charge_reminder import ChargeReminder
+from app.models.clause_audit import LeaseClauseAudit
 from app.models.compliance import ComplianceAuditQueue, ComplianceSyncState, LeaseAudit
 from app.models.contractor import Contractor
 from app.models.document import Document, DocumentCategory, DocumentVersion
@@ -48,6 +49,7 @@ __all__ = [
     "InvitationStatus",
     "Lease",
     "LeaseAudit",
+    "LeaseClauseAudit",
     "LeaseFrequency",
     "LeaseReminder",
     "LeaseTenant",
