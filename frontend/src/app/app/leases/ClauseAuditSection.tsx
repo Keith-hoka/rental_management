@@ -269,7 +269,6 @@ export function ClauseAuditSection({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-text">{document.title}</span>
                 {latest ? <StatusChip audit={latest} /> : null}
-                {latest ? <Badge tone="neutral">{latest.jurisdiction}</Badge> : null}
                 <Button
                   variant="secondary"
                   disabled={!isPdf || running || submitting[document.id] || blocked}
@@ -289,14 +288,19 @@ export function ClauseAuditSection({
               ) : null}
               {latestDone ? (
                 <>
-                  {(() => {
-                    const audited = document.versions.find(
-                      (v) => v.id === latestDone.document_version_id,
-                    );
-                    return audited ? (
-                      <p className="text-xs text-muted">Audited version: v{audited.version_number}</p>
-                    ) : null;
-                  })()}
+                  <div className="flex items-center gap-2">
+                    <Badge tone="neutral">audited as {latestDone.jurisdiction}</Badge>
+                    {(() => {
+                      const audited = document.versions.find(
+                        (v) => v.id === latestDone.document_version_id,
+                      );
+                      return audited ? (
+                        <span className="text-xs text-muted">
+                          Audited version: v{audited.version_number}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
                   <ResultPanel audit={latestDone} />
                 </>
               ) : null}

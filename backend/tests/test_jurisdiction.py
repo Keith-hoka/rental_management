@@ -55,30 +55,29 @@ def test_exception_carries_reason():
     assert isinstance(exc, Exception)
 
 
-async def test_audit_rows_default_to_nsw(db_session):
+async def test_audit_insert_without_jurisdiction_fails(db_session):
+    """No server default: a construction site that forgets jurisdiction fails loudly."""
     import uuid as uuid_mod
     from datetime import date
 
-    from sqlalchemy import select, text
+    from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError
 
-    from app.models import LeaseAudit
     from tests.test_lease_model import make_lease_row
 
     lease = await make_lease_row(db_session)
-    await db_session.execute(
-        text(
-            "INSERT INTO lease_audits (id, lease_id, organization_id, audit_id, as_at, findings)"
-            " VALUES (:id, :lease_id, :org, :audit_id, :as_at, '[]')"
-        ),
-        {
-            "id": str(uuid_mod.uuid4()),
-            "lease_id": str(lease.id),
-            "org": str(lease.organization_id),
-            "audit_id": str(uuid_mod.uuid4()),
-            "as_at": date(2026, 8, 5),
-        },
-    )
-    row = (
-        await db_session.execute(select(LeaseAudit).where(LeaseAudit.lease_id == lease.id))
-    ).scalar_one()
-    assert row.jurisdiction == "NSW"
+    with pytest.raises(IntegrityError):
+        await db_session.execute(
+            text(
+                "INSERT INTO lease_audits (id, lease_id, organization_id, audit_id, as_at, findings)"
+                " VALUES (:id, :lease_id, :org, :audit_id, :as_at, '[]')"
+            ),
+            {
+                "id": str(uuid_mod.uuid4()),
+                "lease_id": str(lease.id),
+                "org": str(lease.organization_id),
+                "audit_id": str(uuid_mod.uuid4()),
+                "as_at": date(2026, 8, 5),
+            },
+        )
+    await db_session.rollback()

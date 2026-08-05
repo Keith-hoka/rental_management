@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 import pytest
 from sqlalchemy import select
 
-from app.compliance_backfill import fix_jurisdictions, main
+from app.compliance_backfill import _print_report, backfill, fix_jurisdictions, main
 from app.models import (
     Document,
     DocumentCategory,
@@ -17,6 +17,7 @@ from app.models import (
     Property,
     User,
 )
+from app.services import clause_audit
 from tests.test_lease_model import make_lease_row
 
 
@@ -64,14 +65,14 @@ async def _seed_document(db_session, lease, user):
     return document, version
 
 
-def _clause_audit(lease, document, version, jurisdiction, created_at=None):
+def _clause_audit(lease, document, version, jurisdiction, status="succeeded", created_at=None):
     audit = LeaseClauseAudit(
         organization_id=lease.organization_id,
         lease_id=lease.id,
         document_id=document.id,
         document_version_id=version.id,
         job_id=str(uuid.uuid4()),
-        status="succeeded",
+        status=status,
         model="claude-opus-4-8",
         engine_version="1.1.1",
         jurisdiction=jurisdiction,
@@ -106,7 +107,7 @@ async def test_fix_jurisdictions_selects_mismatched_leases(db_session, monkeypat
     report = await fix_jurisdictions(db_session, execute=True)
     assert enqueued == [mismatched_lease.id]
     assert report["deterministic_enqueued"] == 1
-    assert report["skipped_matching"] >= 1
+    assert report["skipped_matching_audits"] == 1
     assert report["missing"] == [missing_lease.id]
     assert report["unsupported"] == [qld_lease.id]
 
@@ -139,7 +140,8 @@ async def test_fix_jurisdictions_resubmits_mismatched_clause_audit(db_session, m
 
     assert calls == [(mismatched_lease.id, document.id, version.id)]
     assert report["clause_resubmitted"] == 1
-    assert report["skipped_matching"] >= 1
+    assert report["skipped_matching_clause"] == 1
+    assert report["skipped_matching_audits"] == 0
 
 
 async def test_fix_jurisdictions_skips_resubmit_when_latest_clause_audit_already_matches(
@@ -179,7 +181,7 @@ async def test_fix_jurisdictions_skips_resubmit_when_latest_clause_audit_already
 
     assert calls == []
     assert report["clause_resubmitted"] == 0
-    assert report["skipped_matching"] == 1
+    assert report["skipped_matching_clause"] == 1
 
 
 async def test_fix_jurisdictions_dry_run_reports_without_side_effects(db_session, monkeypatch):
@@ -211,6 +213,111 @@ async def test_fix_jurisdictions_dry_run_reports_without_side_effects(db_session
     assert enqueued == []
     assert submitted == []
     assert report["deterministic_enqueued"] == 1
+    assert report["clause_resubmitted"] == 1
+
+
+@pytest.mark.parametrize("execute", [False, True])
+async def test_fix_jurisdictions_counts_documents_without_versions(
+    db_session, monkeypatch, execute
+):
+    """A document with no stored version is never a resubmit, in either mode."""
+    user = User(email=f"fixjuris-noversion-{execute}@example.com", hashed_password="x", name="NV")
+    db_session.add(user)
+    await db_session.flush()
+
+    lease = await make_lease_row(db_session)
+    await _set_state(db_session, lease, "Victoria")
+    document, version = await _seed_document(db_session, lease, user)
+    db_session.add(_clause_audit(lease, document, version, "NSW"))
+    await db_session.commit()
+
+    async def fake_latest_version(session, document_id):
+        return None
+
+    submitted = []
+
+    async def fake_submit(session, lease_arg, document_arg, version_arg):
+        submitted.append(lease_arg.id)
+
+    monkeypatch.setattr("app.services.clause_audit.latest_version", fake_latest_version)
+    monkeypatch.setattr("app.services.clause_audit.submit_document_audit", fake_submit)
+
+    report = await fix_jurisdictions(db_session, execute=execute)
+
+    assert submitted == []
+    assert report["clause_resubmitted"] == 0
+    assert report["skipped_no_version"] == 1
+
+
+@pytest.mark.parametrize("execute", [False, True])
+async def test_fix_jurisdictions_skips_documents_with_in_flight_audits(
+    db_session, monkeypatch, execute
+):
+    """Mirror the router's IN_FLIGHT guard: never double-submit a running document."""
+    user = User(email=f"fixjuris-inflight-{execute}@example.com", hashed_password="x", name="IF")
+    db_session.add(user)
+    await db_session.flush()
+
+    lease = await make_lease_row(db_session)
+    await _set_state(db_session, lease, "Victoria")
+    document, version = await _seed_document(db_session, lease, user)
+    db_session.add(_clause_audit(lease, document, version, "NSW", status="pending"))
+    await db_session.commit()
+
+    submitted = []
+
+    async def fake_submit(session, lease_arg, document_arg, version_arg):
+        submitted.append(lease_arg.id)
+
+    monkeypatch.setattr("app.services.clause_audit.submit_document_audit", fake_submit)
+
+    report = await fix_jurisdictions(db_session, execute=execute)
+
+    assert submitted == []
+    assert report["clause_resubmitted"] == 0
+    assert report["skipped_in_flight"] == 1
+
+
+async def test_fix_jurisdictions_isolates_clause_read_errors(db_session, monkeypatch):
+    """A transient read failure in the clause branch lands in errors, not a crash."""
+    user = User(email="fixjuris-readerr@example.com", hashed_password="x", name="Read Err")
+    db_session.add(user)
+    await db_session.flush()
+
+    failing_lease = await make_lease_row(db_session)
+    await _set_state(db_session, failing_lease, "Victoria")
+    failing_document, failing_version = await _seed_document(db_session, failing_lease, user)
+    db_session.add(_clause_audit(failing_lease, failing_document, failing_version, "NSW"))
+
+    ok_lease = await make_lease_row(db_session)
+    await _set_state(db_session, ok_lease, "Victoria")
+    ok_document, ok_version = await _seed_document(db_session, ok_lease, user)
+    db_session.add(_clause_audit(ok_lease, ok_document, ok_version, "NSW"))
+
+    await db_session.commit()
+    failing_document_id = failing_document.id
+    failing_lease_id = failing_lease.id
+    ok_lease_id = ok_lease.id
+
+    real_latest_version = clause_audit.latest_version
+
+    async def flaky_latest_version(session, document_id):
+        if document_id == failing_document_id:
+            raise RuntimeError("read boom")
+        return await real_latest_version(session, document_id)
+
+    submitted = []
+
+    async def fake_submit(session, lease_arg, document_arg, version_arg):
+        submitted.append(lease_arg.id)
+
+    monkeypatch.setattr("app.services.clause_audit.latest_version", flaky_latest_version)
+    monkeypatch.setattr("app.services.clause_audit.submit_document_audit", fake_submit)
+
+    report = await fix_jurisdictions(db_session, execute=True)
+
+    assert report["errors"] == [failing_lease_id]
+    assert submitted == [ok_lease_id]
     assert report["clause_resubmitted"] == 1
 
 
@@ -250,7 +357,8 @@ async def test_fix_jurisdictions_execute_isolates_clause_errors(db_session, monk
     assert set(calls) == {ok_lease_id, failing_lease_id}
     assert report["errors"] == [failing_lease_id]
     assert report["clause_resubmitted"] == 1
-    assert report["skipped_matching"] == 0
+    assert report["skipped_matching_audits"] == 0
+    assert report["skipped_matching_clause"] == 0
     assert report["deterministic_enqueued"] == 0
 
     # Prove the successful resubmit is durably committed, not merely pending
@@ -268,6 +376,39 @@ async def test_fix_jurisdictions_execute_isolates_clause_errors(db_session, monk
     assert persisted is not None
 
 
+async def test_backfill_skips_unresolvable_leases(db_session, monkeypatch):
+    """Leases whose property state cannot resolve are skipped, not re-enqueued forever."""
+    ok_lease = await make_lease_row(db_session)
+    await _set_state(db_session, ok_lease, "VIC")
+    await make_lease_row(db_session)  # property state left unset
+    qld_lease = await make_lease_row(db_session)
+    await _set_state(db_session, qld_lease, "QLD")
+    await db_session.commit()
+
+    enqueued = []
+
+    async def fake_enqueue(session, lease_id):
+        enqueued.append(lease_id)
+
+    monkeypatch.setattr("app.compliance_backfill.enqueue_audit", fake_enqueue)
+
+    result = await backfill(db_session)
+
+    assert enqueued == [ok_lease.id]
+    assert result == {"enqueued": 1, "unresolvable_skipped": 2}
+
+
+def test_print_report_prints_list_values_one_id_per_line(capsys):
+    first, second = uuid.uuid4(), uuid.uuid4()
+    _print_report({"deterministic_enqueued": 2, "missing": [first, second], "unsupported": []})
+    out = capsys.readouterr().out
+    assert "deterministic_enqueued: 2" in out
+    assert "missing (2):" in out
+    assert f"\n  {first}\n  {second}\n" in out
+    assert "unsupported (0):" in out
+    assert "UUID(" not in out
+
+
 async def test_main_default_runs_existing_backfill(monkeypatch, capsys):
     @asynccontextmanager
     async def fake_sessionmaker():
@@ -277,7 +418,7 @@ async def test_main_default_runs_existing_backfill(monkeypatch, capsys):
 
     async def fake_backfill(session):
         calls.append(session)
-        return 3
+        return {"enqueued": 3, "unresolvable_skipped": 2}
 
     monkeypatch.setattr("app.compliance_backfill.SessionLocal", lambda: fake_sessionmaker())
     monkeypatch.setattr("app.compliance_backfill.backfill", fake_backfill)
@@ -285,7 +426,7 @@ async def test_main_default_runs_existing_backfill(monkeypatch, capsys):
     await main([])
 
     assert len(calls) == 1
-    assert "backfill: enqueued 3 leases" in capsys.readouterr().out
+    assert "backfill: enqueued 3 leases, skipped 2 unresolvable" in capsys.readouterr().out
 
 
 async def test_main_fix_jurisdictions_dry_run_prints_report(monkeypatch, capsys):
@@ -300,7 +441,8 @@ async def test_main_fix_jurisdictions_dry_run_prints_report(monkeypatch, capsys)
         return {
             "deterministic_enqueued": 1,
             "clause_resubmitted": 0,
-            "skipped_matching": 2,
+            "skipped_matching_audits": 2,
+            "skipped_matching_clause": 0,
             "missing": [],
             "unsupported": [],
         }
@@ -313,7 +455,7 @@ async def test_main_fix_jurisdictions_dry_run_prints_report(monkeypatch, capsys)
     assert captured["execute"] is False
     out = capsys.readouterr().out
     assert "deterministic_enqueued: 1" in out
-    assert "skipped_matching: 2" in out
+    assert "skipped_matching_audits: 2" in out
 
 
 async def test_main_fix_jurisdictions_execute_flag(monkeypatch, capsys):
@@ -328,7 +470,8 @@ async def test_main_fix_jurisdictions_execute_flag(monkeypatch, capsys):
         return {
             "deterministic_enqueued": 0,
             "clause_resubmitted": 0,
-            "skipped_matching": 0,
+            "skipped_matching_audits": 0,
+            "skipped_matching_clause": 0,
             "missing": [],
             "unsupported": [],
         }

@@ -18,7 +18,7 @@ class LeaseAudit(Base):
     audit_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True)
     as_at: Mapped[date] = mapped_column(Date)
     findings: Mapped[list] = mapped_column(JSON)
-    jurisdiction: Mapped[str] = mapped_column(String(3), nullable=False, server_default="NSW")
+    jurisdiction: Mapped[str] = mapped_column(String(3), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

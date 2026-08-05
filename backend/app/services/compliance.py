@@ -11,8 +11,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import ComplianceAuditQueue, ComplianceSyncState, Lease, LeaseAudit, Property
-from app.services.jurisdiction import JurisdictionUnresolved, jurisdiction_for
+from app.models import ComplianceAuditQueue, ComplianceSyncState, Lease, LeaseAudit
+from app.services.jurisdiction import JurisdictionUnresolved, property_jurisdiction
 from app.services.notify import manager_emails, manager_user_ids, notify_users, safe_send
 
 logger = logging.getLogger(__name__)
@@ -80,10 +80,7 @@ async def load_chain(session: AsyncSession, lease: Lease) -> list[Lease]:
 
 async def resolve_jurisdiction(session: AsyncSession, lease: Lease) -> str:
     """The audit jurisdiction from the lease's property state; raises when unresolved."""
-    state = (
-        await session.execute(select(Property.state).where(Property.id == lease.property_id))
-    ).scalar_one()
-    code, reason = jurisdiction_for(state)
+    code, reason = await property_jurisdiction(session, lease.property_id)
     if code is None:
         raise JurisdictionUnresolved(reason)
     return code

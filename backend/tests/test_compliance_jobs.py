@@ -264,7 +264,7 @@ async def test_backfill_enqueues_only_active_unaudited(
     await db_session.commit()
     await client.post(f"/api/v1/leases/{audited['id']}/compliance-audit", headers=headers)
 
-    count = await backfill(db_session)
+    result = await backfill(db_session)
     queued = {
         str(row.lease_id)
         for row in (await db_session.execute(select(ComplianceAuditQueue))).scalars().all()
@@ -272,4 +272,4 @@ async def test_backfill_enqueues_only_active_unaudited(
     assert audited["id"] not in queued
     assert renewed["id"] not in queued
     assert plain["id"] in queued
-    assert count == len(queued)
+    assert result == {"enqueued": len(queued), "unresolvable_skipped": 0}

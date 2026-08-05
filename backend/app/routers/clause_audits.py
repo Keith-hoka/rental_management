@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.models import Document, DocumentCategory, LeaseClauseAudit, Membership, Property, Role
+from app.models import Document, DocumentCategory, LeaseClauseAudit, Membership, Role
 from app.routers.leases import get_owned_lease
 from app.schemas.clause_audit import ClauseAuditInfo, ClauseAuditListState
 from app.services import clause_audit, compliance
-from app.services.jurisdiction import jurisdiction_for
+from app.services.jurisdiction import property_jurisdiction
 
 logger = logging.getLogger(__name__)
 
@@ -128,10 +128,7 @@ async def list_clause_audits(
         .scalars()
         .all()
     )
-    state_value = (
-        await session.execute(select(Property.state).where(Property.id == lease.property_id))
-    ).scalar_one()
-    code, reason = jurisdiction_for(state_value)
+    code, reason = await property_jurisdiction(session, lease.property_id)
     return ClauseAuditListState(
         enabled=compliance.enabled(),
         audits=[_info(row) for row in rows],

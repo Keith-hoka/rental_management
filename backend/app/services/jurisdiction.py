@@ -2,6 +2,11 @@
 
 from typing import Literal
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Property
+
 SUPPORTED_JURISDICTIONS = {"NSW", "VIC"}
 
 _ALIASES = {
@@ -50,3 +55,11 @@ def jurisdiction_for(property_state: str | None) -> tuple[str | None, Reason]:
     if code not in SUPPORTED_JURISDICTIONS:
         return (None, "unsupported")
     return (code, "ok")
+
+
+async def property_jurisdiction(session: AsyncSession, property_id) -> tuple[str | None, Reason]:
+    """Resolve a property's stored state to (supported code, "ok"), or (None, why not)."""
+    state = (
+        await session.execute(select(Property.state).where(Property.id == property_id))
+    ).scalar_one()
+    return jurisdiction_for(state)
