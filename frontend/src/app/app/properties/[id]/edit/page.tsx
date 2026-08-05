@@ -28,6 +28,8 @@ import {
   linkButtonOutline,
 } from "@/components/ui";
 
+const AU_STATES = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "ACT", "NT"] as const;
+
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -147,11 +149,21 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   />
                 </div>
                 <div className="flex-1">
-                  <Input
-                    placeholder="State / province"
+                  <Select
+                    aria-label="State"
                     value={prop.state ?? ""}
                     onChange={(e) => set("state", e.target.value)}
-                  />
+                  >
+                    <option value="">State / territory</option>
+                    {AU_STATES.map((code) => (
+                      <option key={code} value={code}>
+                        {code}
+                      </option>
+                    ))}
+                    {prop.state && !AU_STATES.includes(prop.state as (typeof AU_STATES)[number]) ? (
+                      <option value={prop.state}>{prop.state}</option>
+                    ) : null}
+                  </Select>
                 </div>
                 <div className="flex-1">
                   <Input

@@ -20,12 +20,17 @@ export interface ComplianceAudit {
   audit_id: string;
   as_at: string;
   findings: ComplianceFinding[];
+  jurisdiction: string;
   created_at: string;
 }
+
+export type JurisdictionStatus = "ok" | "missing" | "unsupported";
 
 export interface ComplianceAuditState {
   enabled: boolean;
   audit: ComplianceAudit | null;
+  jurisdiction_status: JurisdictionStatus;
+  jurisdiction: string | null;
 }
 
 export function getComplianceAudit(leaseId: string): Promise<ComplianceAuditState> {

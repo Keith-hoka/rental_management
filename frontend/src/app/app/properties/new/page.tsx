@@ -18,6 +18,8 @@ import {
   linkButtonOutline,
 } from "@/components/ui";
 
+const AU_STATES = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "ACT", "NT"] as const;
+
 const EMPTY: PropertyInput = {
   address: "",
   city: "",
@@ -85,11 +87,18 @@ export default function NewPropertyPage() {
               />
             </div>
             <div className="flex-1">
-              <Input
-                placeholder="State / province"
+              <Select
+                aria-label="State"
                 value={form.state}
                 onChange={(e) => set("state", e.target.value)}
-              />
+              >
+                <option value="">State / territory</option>
+                {AU_STATES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div className="flex-1">
               <Input

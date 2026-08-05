@@ -26,6 +26,10 @@ const RULE_LABELS: Record<string, string> = {
   "nsw.fixed_term_increase_disclosure": "Fixed-term increase disclosure (s42)",
   "nsw.no_other_security": "No security besides bond (s160)",
   "nsw.break_fee_cap": "Break fee cap (s107)",
+  "vic.bond_max_1_month": "Bond cap (s 31)",
+  "vic.advance_max_1_month": "Rent in advance cap (s 40)",
+  "vic.rent_increase_frequency": "Rent increase frequency (s 44)",
+  "vic.fixed_term_increase_provision": "Fixed-term increase provision (s 44)",
 };
 
 const NOT_FILLED = "not filled in for this lease";
@@ -62,7 +66,13 @@ function skippedDetail(finding: ComplianceFinding): string {
   return finding.summary;
 }
 
-export function ComplianceSection({ leaseId }: { leaseId: string }) {
+export function ComplianceSection({
+  leaseId,
+  propertyId,
+}: {
+  leaseId: string;
+  propertyId: string;
+}) {
   const [state, setState] = useState<ComplianceAuditState | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,16 +107,32 @@ export function ComplianceSection({ leaseId }: { leaseId: string }) {
     }
   }
 
+  const title = state.jurisdiction ? `${state.jurisdiction} compliance` : "Compliance";
+  const blocked = state.jurisdiction_status !== "ok";
   return (
     <Card
       className="mt-5"
-      title="NSW compliance"
+      title={title}
       actions={
-        <Button onClick={check} disabled={running}>
+        <Button onClick={check} disabled={running || blocked}>
           {running ? "Checking..." : "Check now"}
         </Button>
       }
     >
+      {blocked && (
+        <p className="mb-2 text-sm text-muted">
+          {state.jurisdiction_status === "missing" ? (
+            <>
+              Set the property&apos;s state to enable compliance checks.{" "}
+              <a className="underline" href={`/app/properties/${propertyId}/edit`}>
+                Edit property
+              </a>
+            </>
+          ) : (
+            "Compliance checks are not yet supported for this property's state."
+          )}
+        </p>
+      )}
       {error && <p className="mb-2 text-sm text-danger-fg">{error}</p>}
       {audit ? (
         <div className="space-y-2">
@@ -114,6 +140,7 @@ export function ComplianceSection({ leaseId }: { leaseId: string }) {
             <Badge tone="danger">{counts.red} issues</Badge>
             <Badge tone="success">{counts.green} compliant</Badge>
             <Badge tone="neutral">{counts.skipped} skipped</Badge>
+            <Badge tone="neutral">audited as {audit.jurisdiction}</Badge>
             <span className="text-xs text-muted">as at {audit.as_at}</span>
           </div>
           <ul className="divide-y divide-border">

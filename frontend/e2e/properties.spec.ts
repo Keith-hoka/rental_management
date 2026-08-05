@@ -20,7 +20,7 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   // Exact match: "Address" must not also match the list page's search placeholder.
   await page.getByPlaceholder("Address", { exact: true }).fill("42 Test Lane");
   await page.getByPlaceholder("City").fill("Sydney");
-  await page.getByPlaceholder("State / province").fill("NSW");
+  await page.getByLabel("State").selectOption("NSW");
   await page.getByPlaceholder("Postcode").fill("2000");
   await page.getByRole("button", { name: "Create property" }).click();
 
@@ -44,7 +44,7 @@ test("create, list, edit, and delete a property", async ({ page }) => {
   await page.getByRole("link", { name: "Edit" }).click();
   await expect(page).toHaveURL(/\/app\/properties\/[0-9a-f-]+\/edit$/);
   await expect(page.getByPlaceholder("City")).toHaveValue("Sydney");
-  await expect(page.getByPlaceholder("State / province")).toHaveValue("NSW");
+  await expect(page.getByLabel("State")).toHaveValue("NSW");
   await page.getByPlaceholder("Postcode").fill("2010");
   await page.getByLabel("Bedrooms").fill("5");
   await page.getByRole("button", { name: "Save" }).click();

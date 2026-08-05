@@ -6,6 +6,7 @@ import {
   listClauseAudits,
   runClauseAudit,
   type ClauseAudit,
+  type ClauseAuditListState,
   type ClauseFinding,
   type ClauseVerdict,
 } from "@/lib/clauseAudit";
@@ -35,6 +36,22 @@ const CLAUSE_RULE_LABELS: Record<string, string> = {
   "nsw.clause.habitability_term": "Required term: clean and habitable (s 52)",
   "nsw.clause.repairs_term": "Required term: repairs (s 63)",
   "nsw.clause.locks_security_term": "Required term: locks and security (s 70)",
+  "vic.clause.renter_insurance": "Prohibited term: renter must take out insurance (s 27B)",
+  "vic.clause.provider_liability_exemption": "Prohibited term: provider liability exemption (s 27B)",
+  "vic.clause.breach_penalty": "Prohibited term: breach penalty or remaining rent (s 27B)",
+  "vic.clause.professional_cleaning_required": "Prohibited term: professional cleaning required (s 27B)",
+  "vic.clause.professional_cleaning_cost": "Prohibited term: professional cleaning cost (s 27B)",
+  "vic.clause.no_breach_rent_inducement": "Prohibited term: conditional rent inducement (s 27B)",
+  "vic.clause.preparation_costs": "Prohibited term: agreement preparation costs (s 27B(2))",
+  "vic.clause.unreviewed_contract": "Prohibited term: binds renter to unreviewed contract (reg 11)",
+  "vic.clause.renter_indemnity": "Prohibited term: renter indemnifies provider (reg 11)",
+  "vic.clause.late_availability_claim_waiver": "Prohibited term: bars claim for late availability (reg 11)",
+  "vic.clause.costly_payment_method": "Prohibited term: costly payment method (reg 11)",
+  "vic.clause.third_party_services": "Prohibited term: nominated third-party services (reg 11)",
+  "vic.clause.safety_maintenance_transfer": "Prohibited term: safety maintenance transferred (reg 11)",
+  "vic.clause.tribunal_costs_transfer": "Prohibited term: Tribunal costs transferred (reg 11)",
+  "vic.clause.insurance_excess_transfer": "Prohibited term: provider's insurance excess transferred (reg 11)",
+  "vic.clause.fixed_break_fees": "Prohibited term: fixed break fees without basis (reg 11)",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -156,12 +173,14 @@ function ResultPanel({ audit }: { audit: ClauseAudit }) {
 
 export function ClauseAuditSection({
   leaseId,
+  propertyId,
   documents,
 }: {
   leaseId: string;
+  propertyId: string;
   documents: DocumentInfo[];
 }) {
-  const [state, setState] = useState<{ enabled: boolean; audits: ClauseAudit[] } | null>(null);
+  const [state, setState] = useState<ClauseAuditListState | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const leaseDocuments = documents.filter((d) => d.category === "lease");
@@ -198,6 +217,7 @@ export function ClauseAuditSection({
   }, [inFlight, load]);
 
   if (!state?.enabled || leaseDocuments.length === 0) return null;
+  const blocked = state.jurisdiction_status !== "ok";
 
   const byDocument = new Map<string, ClauseAudit[]>();
   for (const audit of state.audits) {
@@ -222,6 +242,20 @@ export function ClauseAuditSection({
 
   return (
     <Card className="mt-5" title="Clause audit">
+      {blocked && (
+        <p className="mb-2 text-sm text-muted">
+          {state.jurisdiction_status === "missing" ? (
+            <>
+              Set the property&apos;s state to enable compliance checks.{" "}
+              <a className="underline" href={`/app/properties/${propertyId}/edit`}>
+                Edit property
+              </a>
+            </>
+          ) : (
+            "Compliance checks are not yet supported for this property's state."
+          )}
+        </p>
+      )}
       <div className="space-y-4">
         {leaseDocuments.map((document) => {
           const audits = byDocument.get(document.id) ?? [];
@@ -235,9 +269,10 @@ export function ClauseAuditSection({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-text">{document.title}</span>
                 {latest ? <StatusChip audit={latest} /> : null}
+                {latest ? <Badge tone="neutral">{latest.jurisdiction}</Badge> : null}
                 <Button
                   variant="secondary"
-                  disabled={!isPdf || running || submitting[document.id]}
+                  disabled={!isPdf || running || submitting[document.id] || blocked}
                   onClick={() => void run(document.id)}
                 >
                   {submitting[document.id] ? "Submitting..." : "Run clause audit"}
