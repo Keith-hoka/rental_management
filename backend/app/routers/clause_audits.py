@@ -114,7 +114,7 @@ async def list_clause_audits(
     membership: Membership = Depends(manager),
     session: AsyncSession = Depends(get_session),
 ) -> ClauseAuditListState:
-    """The lease's clause audits, newest first, plus the feature flag and live jurisdiction status."""
+    """The lease's clause audits, newest first, plus the feature flag and jurisdiction status."""
     lease = await get_owned_lease(lease_id, membership, session)
     rows = (
         (
