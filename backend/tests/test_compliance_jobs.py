@@ -129,6 +129,38 @@ async def test_poll_stores_and_notifies_active_lease(client, db_session, complia
     assert cursor.value
 
 
+async def test_poll_stores_jurisdiction_from_audit_body(
+    client, db_session, compliance_on, monkeypatch
+):
+    """A polled change's stored row takes jurisdiction from the audit body,
+    not the jurisdiction column's NSW server_default."""
+    headers = await landlord_headers(client)
+    lease = await _make_lease(client, headers, state="VIC")
+    new_audit_id = str(uuid.uuid4())
+    now = datetime.now(UTC).isoformat()
+    calls = {"count": 0}
+
+    async def _changes(since, limit=100):
+        calls["count"] += 1
+        if calls["count"] > 1:
+            return []
+        return [_change(lease["id"], new_audit_id, now)]
+
+    async def _get(audit_id):
+        body = dict(FAKE_AUDIT)
+        body["id"] = audit_id
+        body["client_ref"] = lease["id"]
+        body["jurisdiction"] = "VIC"
+        return body
+
+    monkeypatch.setattr("app.services.compliance.list_changes", _changes)
+    monkeypatch.setattr("app.services.compliance.get_audit", _get)
+
+    assert await poll_audit_changes(db_session) == 1
+    stored = (await db_session.execute(select(LeaseAudit))).scalar_one()
+    assert stored.jurisdiction == "VIC"
+
+
 async def test_poll_skips_superseded_and_unknown(client, db_session, compliance_on, fake_feed):
     headers = await landlord_headers(client)
     lease = await _make_lease(client, headers)

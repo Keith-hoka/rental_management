@@ -239,6 +239,7 @@ async def _apply_change(session: AsyncSession, change: dict) -> list[tuple[str, 
             audit_id=audit_id,
             as_at=date.fromisoformat(body["as_at"]),
             findings=body["findings"],
+            jurisdiction=body["jurisdiction"],
         )
     )
     delta = _delta_lines(change["changes"])
