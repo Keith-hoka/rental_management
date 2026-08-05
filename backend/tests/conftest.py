@@ -17,6 +17,18 @@ def disable_real_email(monkeypatch):
     monkeypatch.setattr(settings, "resend_api_key", None)
 
 
+@pytest.fixture(autouse=True)
+def disable_live_compliance(monkeypatch):
+    """Blank compliance settings so a developer .env never enables the
+    integration in tests, which would flip enabled() and hit the live API.
+
+    Autouse fixtures run first, so compliance_on still re-enables it with
+    fake endpoints for the tests that request it.
+    """
+    monkeypatch.setattr(settings, "compliance_api_url", "")
+    monkeypatch.setattr(settings, "compliance_api_key", "")
+
+
 @pytest.fixture
 async def engine():
     engine = create_async_engine(settings.test_database_url)
