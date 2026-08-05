@@ -2,7 +2,7 @@
 
 import uuid
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import select
@@ -64,8 +64,8 @@ async def _seed_document(db_session, lease, user):
     return document, version
 
 
-def _clause_audit(lease, document, version, jurisdiction):
-    return LeaseClauseAudit(
+def _clause_audit(lease, document, version, jurisdiction, created_at=None):
+    audit = LeaseClauseAudit(
         organization_id=lease.organization_id,
         lease_id=lease.id,
         document_id=document.id,
@@ -76,6 +76,9 @@ def _clause_audit(lease, document, version, jurisdiction):
         engine_version="1.1.1",
         jurisdiction=jurisdiction,
     )
+    if created_at is not None:
+        audit.created_at = created_at
+    return audit
 
 
 async def test_fix_jurisdictions_selects_mismatched_leases(db_session, monkeypatch):
@@ -137,6 +140,46 @@ async def test_fix_jurisdictions_resubmits_mismatched_clause_audit(db_session, m
     assert calls == [(mismatched_lease.id, document.id, version.id)]
     assert report["clause_resubmitted"] == 1
     assert report["skipped_matching"] >= 1
+
+
+async def test_fix_jurisdictions_skips_resubmit_when_latest_clause_audit_already_matches(
+    db_session, monkeypatch
+):
+    """Latest-per-document dedup must key off created_at, not row order.
+
+    This is the exact shape a completed --fix-jurisdictions run leaves behind:
+    one document with two clause audits, the newer one already corrected to
+    VIC and an older stale NSW row still sitting underneath it. A repeat run
+    must recognise the document as already fixed via the newest row, or every
+    previously-fixed document gets resubmitted and burns LLM quota.
+    """
+    user = User(email="fixjuris-dedup@example.com", hashed_password="x", name="Dedup")
+    db_session.add(user)
+    await db_session.flush()
+
+    lease = await make_lease_row(db_session)
+    await _set_state(db_session, lease, "Victoria")
+    document, version = await _seed_document(db_session, lease, user)
+
+    older_at = datetime(2026, 7, 20, 9, 0, tzinfo=UTC)
+    newer_at = datetime(2026, 7, 27, 9, 0, tzinfo=UTC)
+    db_session.add(_clause_audit(lease, document, version, "NSW", created_at=older_at))
+    db_session.add(_clause_audit(lease, document, version, "VIC", created_at=newer_at))
+
+    await db_session.commit()
+
+    calls = []
+
+    async def fake_submit(session, lease_arg, document_arg, version_arg):
+        calls.append((lease_arg.id, document_arg.id, version_arg.id))
+
+    monkeypatch.setattr("app.services.clause_audit.submit_document_audit", fake_submit)
+
+    report = await fix_jurisdictions(db_session, execute=True)
+
+    assert calls == []
+    assert report["clause_resubmitted"] == 0
+    assert report["skipped_matching"] == 1
 
 
 async def test_fix_jurisdictions_dry_run_reports_without_side_effects(db_session, monkeypatch):
