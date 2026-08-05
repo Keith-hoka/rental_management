@@ -8,10 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.models import Document, DocumentCategory, LeaseClauseAudit, Membership, Role
+from app.models import Document, DocumentCategory, LeaseClauseAudit, Membership, Property, Role
 from app.routers.leases import get_owned_lease
 from app.schemas.clause_audit import ClauseAuditInfo, ClauseAuditListState
 from app.services import clause_audit, compliance
+from app.services.jurisdiction import jurisdiction_for
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ def _info(row: LeaseClauseAudit) -> ClauseAuditInfo:
         discrepancies=row.discrepancies,
         model=row.model,
         engine_version=row.engine_version,
+        jurisdiction=row.jurisdiction,
         error=row.error,
         created_at=row.created_at,
         completed_at=row.completed_at,
@@ -78,6 +80,10 @@ async def run_clause_audit(
         raise HTTPException(status_code=409, detail="A clause audit is already in flight")
     try:
         row = await clause_audit.submit_document_audit(session, lease, document, version)
+    except compliance.JurisdictionUnresolved as exc:
+        raise HTTPException(
+            status_code=422, detail=f"Property state unresolved: {exc.reason}"
+        ) from exc
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=500,
@@ -108,7 +114,7 @@ async def list_clause_audits(
     membership: Membership = Depends(manager),
     session: AsyncSession = Depends(get_session),
 ) -> ClauseAuditListState:
-    """The lease's clause audits, newest first, plus the feature flag."""
+    """The lease's clause audits, newest first, plus the feature flag and live jurisdiction status."""
     lease = await get_owned_lease(lease_id, membership, session)
     rows = (
         (
@@ -122,4 +128,13 @@ async def list_clause_audits(
         .scalars()
         .all()
     )
-    return ClauseAuditListState(enabled=compliance.enabled(), audits=[_info(row) for row in rows])
+    state_value = (
+        await session.execute(select(Property.state).where(Property.id == lease.property_id))
+    ).scalar_one()
+    code, reason = jurisdiction_for(state_value)
+    return ClauseAuditListState(
+        enabled=compliance.enabled(),
+        audits=[_info(row) for row in rows],
+        jurisdiction_status=reason,
+        jurisdiction=code,
+    )

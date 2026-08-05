@@ -8,10 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.models import LeaseAudit, Membership, Role
+from app.models import LeaseAudit, Membership, Property, Role
 from app.routers.leases import get_owned_lease
 from app.schemas.compliance import ComplianceAuditInfo, ComplianceAuditState
 from app.services import compliance
+from app.services.jurisdiction import jurisdiction_for
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ def _info(audit: LeaseAudit) -> ComplianceAuditInfo:
         audit_id=audit.audit_id,
         as_at=audit.as_at,
         findings=audit.findings,
+        jurisdiction=audit.jurisdiction,
         created_at=audit.created_at,
     )
 
@@ -42,6 +44,10 @@ async def run_audit_now(
     lease = await get_owned_lease(lease_id, membership, session)
     try:
         audit = await compliance.run_lease_audit(session, lease)
+    except compliance.JurisdictionUnresolved as exc:
+        raise HTTPException(
+            status_code=422, detail=f"Property state unresolved: {exc.reason}"
+        ) from exc
     except httpx.HTTPError as exc:
         logger.warning("Compliance audit failed for lease %s: %s", lease_id, exc)
         raise HTTPException(status_code=502, detail="Compliance service unavailable") from exc
@@ -55,7 +61,7 @@ async def latest_audit(
     membership: Membership = Depends(manager),
     session: AsyncSession = Depends(get_session),
 ) -> ComplianceAuditState:
-    """The newest stored audit for the lease, plus the feature flag."""
+    """The newest stored audit for the lease, plus the feature flag and live jurisdiction status."""
     lease = await get_owned_lease(lease_id, membership, session)
     row = (
         await session.execute(
@@ -65,6 +71,13 @@ async def latest_audit(
             .limit(1)
         )
     ).scalar_one_or_none()
+    state_value = (
+        await session.execute(select(Property.state).where(Property.id == lease.property_id))
+    ).scalar_one()
+    code, reason = jurisdiction_for(state_value)
     return ComplianceAuditState(
-        enabled=compliance.enabled(), audit=_info(row) if row is not None else None
+        enabled=compliance.enabled(),
+        audit=_info(row) if row is not None else None,
+        jurisdiction_status=reason,
+        jurisdiction=code,
     )

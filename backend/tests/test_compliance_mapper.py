@@ -2,11 +2,21 @@ import uuid as uuid_mod
 from datetime import date
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.models import ComplianceAuditQueue, ComplianceSyncState, Lease, LeaseAudit, LeaseFrequency
+from app.models import (
+    ComplianceAuditQueue,
+    ComplianceSyncState,
+    Lease,
+    LeaseAudit,
+    LeaseFrequency,
+    Property,
+)
+from app.services import compliance
 from app.services.compliance import chain_to_audit_payload, enabled, load_chain
+from app.services.jurisdiction import JurisdictionUnresolved
 
 
 def test_disabled_by_default():
@@ -60,7 +70,7 @@ def _lease(start, end, rent, bond=None, prev=None, **money):
 
 def test_payload_single_lease_no_increases():
     lease = _lease("2026-01-01", "2026-12-31", 600, bond=2400)
-    payload = chain_to_audit_payload([lease])
+    payload = chain_to_audit_payload([lease], "NSW")
     assert payload["jurisdiction"] == "NSW"
     assert payload["client_ref"] == str(lease.id)
     body = payload["lease"]
@@ -76,7 +86,7 @@ def test_payload_chain_synthesises_increases_from_root():
     first = _lease("2024-01-01", "2024-12-31", 600)
     second = _lease("2025-01-01", "2025-12-31", 650, prev=first)
     third = _lease("2026-01-01", "2026-12-31", 650, prev=second)
-    payload = chain_to_audit_payload([first, second, third])
+    payload = chain_to_audit_payload([first, second, third], "NSW")
     body = payload["lease"]
     assert payload["client_ref"] == str(third.id)
     assert body["start_date"] == "2024-01-01"
@@ -87,13 +97,13 @@ def test_payload_chain_synthesises_increases_from_root():
 def test_payload_decrease_emits_nothing():
     first = _lease("2024-01-01", "2024-12-31", 700)
     second = _lease("2025-01-01", "2025-12-31", 650, prev=first)
-    payload = chain_to_audit_payload([first, second])
+    payload = chain_to_audit_payload([first, second], "NSW")
     assert "rent_increases" not in payload["lease"]
 
 
 def test_payload_omits_missing_bond():
     lease = _lease("2026-01-01", "2026-12-31", 600)
-    assert "bond_amount" not in chain_to_audit_payload([lease])["lease"]
+    assert "bond_amount" not in chain_to_audit_payload([lease], "NSW")["lease"]
 
 
 async def test_load_chain_walks_to_root(db_session):
@@ -117,7 +127,7 @@ def test_payload_sends_money_fields_when_set():
         other_security_amount=0,
         break_fee_amount=2400,
     )
-    body = chain_to_audit_payload([lease])["lease"]
+    body = chain_to_audit_payload([lease], "NSW")["lease"]
     assert body["rent_in_advance_amount"] == "1200"
     assert body["holding_deposit_amount"] == "600"
     assert body["other_security_amount"] == "0"
@@ -125,7 +135,7 @@ def test_payload_sends_money_fields_when_set():
 
 
 def test_payload_omits_null_money_fields():
-    body = chain_to_audit_payload([_lease("2026-01-01", "2026-12-31", 600)])["lease"]
+    body = chain_to_audit_payload([_lease("2026-01-01", "2026-12-31", 600)], "NSW")["lease"]
     for field in (
         "rent_in_advance_amount",
         "holding_deposit_amount",
@@ -138,5 +148,32 @@ def test_payload_omits_null_money_fields():
 def test_payload_uses_newest_lease_money_fields():
     first = _lease("2024-01-01", "2024-12-31", 600, break_fee_amount=9999)
     second = _lease("2025-01-01", "2025-12-31", 600, prev=first, break_fee_amount=2400)
-    body = chain_to_audit_payload([first, second])["lease"]
+    body = chain_to_audit_payload([first, second], "NSW")["lease"]
     assert body["break_fee_amount"] == "2400"
+
+
+def test_payload_carries_the_given_jurisdiction():
+    lease = _lease("2026-01-01", "2026-12-31", 600)
+    payload = chain_to_audit_payload([lease], "VIC")
+    assert payload["jurisdiction"] == "VIC"
+
+
+async def test_resolve_jurisdiction_by_property_state(db_session):
+    from tests.test_lease_model import make_lease_row
+
+    lease = await make_lease_row(db_session)
+    prop = (
+        await db_session.execute(select(Property).where(Property.id == lease.property_id))
+    ).scalar_one()
+    prop.state = "Victoria"
+    await db_session.flush()
+    assert await compliance.resolve_jurisdiction(db_session, lease) == "VIC"
+
+
+async def test_resolve_jurisdiction_missing_raises(db_session):
+    from tests.test_lease_model import make_lease_row
+
+    lease = await make_lease_row(db_session)
+    with pytest.raises(JurisdictionUnresolved) as excinfo:
+        await compliance.resolve_jurisdiction(db_session, lease)
+    assert excinfo.value.reason == "missing"

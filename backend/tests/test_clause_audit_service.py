@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
@@ -15,9 +16,11 @@ from app.models import (
     LeaseFrequency,
     Membership,
     Notification,
+    Property,
     User,
 )
 from app.services import clause_audit
+from app.services.jurisdiction import JurisdictionUnresolved
 from tests.test_portal import make_lease
 from tests.test_properties_crud import landlord_headers
 
@@ -70,6 +73,16 @@ async def _seed_document(db_session, org_id, lease_id, user_id, stored_name="sto
     )
     await db_session.commit()
     return document
+
+
+async def _set_state(db_session, lease_id, state):
+    """Set the state on the lease's property and flush."""
+    lease = (await db_session.execute(select(Lease).where(Lease.id == lease_id))).scalar_one()
+    prop = (
+        await db_session.execute(select(Property).where(Property.id == lease.property_id))
+    ).scalar_one()
+    prop.state = state
+    await db_session.flush()
 
 
 async def test_lease_clause_audit_round_trip(client, db_session):
@@ -127,6 +140,7 @@ async def test_submit_document_audit_posts_latest_version(
     headers = await landlord_headers(client, email)
     org_id, user_id = await _org_and_user(db_session, email)
     lease_id = uuid.UUID(await make_lease(client, headers, "2 Submit St"))
+    await _set_state(db_session, lease_id, "NSW")
     document = await _seed_document(db_session, org_id, lease_id, user_id)
     db_session.add(
         DocumentVersion(
@@ -167,6 +181,7 @@ async def test_submit_document_audit_posts_latest_version(
     assert row.job_id == FAKE_JOB["id"]
     assert row.status == "pending"
     assert row.model == "claude-opus-4-8" and row.engine_version == "1.1.1"
+    assert row.jurisdiction == "NSW"
     version_2 = (
         await db_session.execute(
             select(DocumentVersion.id).where(
@@ -176,6 +191,52 @@ async def test_submit_document_audit_posts_latest_version(
         )
     ).scalar_one()
     assert row.document_version_id == version_2
+
+
+async def test_submit_document_audit_carries_resolved_jurisdiction(
+    client, db_session, tmp_path, monkeypatch
+):
+    email = "clausevic@example.com"
+    headers = await landlord_headers(client, email)
+    org_id, user_id = await _org_and_user(db_session, email)
+    lease_id = uuid.UUID(await make_lease(client, headers, "8 Jurisdiction St"))
+    await _set_state(db_session, lease_id, "Victoria")
+    document = await _seed_document(db_session, org_id, lease_id, user_id)
+    monkeypatch.setattr(settings, "documents_dir", str(tmp_path))
+    Path(tmp_path, "stored.pdf").write_bytes(b"%PDF-1.4 stored")
+
+    captured = {}
+
+    async def fake_create(filename, content, content_type, payload):
+        captured["payload"] = payload
+        return FAKE_JOB
+
+    monkeypatch.setattr("app.services.clause_audit.create_clause_audit", fake_create)
+    lease = (await db_session.execute(select(Lease).where(Lease.id == lease_id))).scalar_one()
+    version = await clause_audit.latest_version(db_session, document.id)
+
+    row = await clause_audit.submit_document_audit(db_session, lease, document, version)
+
+    assert captured["payload"]["jurisdiction"] == "VIC"
+    assert row.jurisdiction == "VIC"
+
+
+async def test_submit_document_audit_raises_when_jurisdiction_unresolved(
+    client, db_session, tmp_path, monkeypatch
+):
+    email = "clauseunresolved@example.com"
+    headers = await landlord_headers(client, email)
+    org_id, user_id = await _org_and_user(db_session, email)
+    lease_id = uuid.UUID(await make_lease(client, headers, "9 Unresolved St"))
+    document = await _seed_document(db_session, org_id, lease_id, user_id)
+    monkeypatch.setattr(settings, "documents_dir", str(tmp_path))
+    Path(tmp_path, "stored.pdf").write_bytes(b"%PDF-1.4 stored")
+    lease = (await db_session.execute(select(Lease).where(Lease.id == lease_id))).scalar_one()
+    version = await clause_audit.latest_version(db_session, document.id)
+
+    with pytest.raises(JurisdictionUnresolved) as excinfo:
+        await clause_audit.submit_document_audit(db_session, lease, document, version)
+    assert excinfo.value.reason == "missing"
 
 
 def _terminal_job(job_id, status="succeeded", findings=None, discrepancies=None, error=None):

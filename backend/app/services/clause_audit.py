@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import Document, DocumentVersion, Lease, LeaseClauseAudit
+from app.services.compliance import resolve_jurisdiction
 from app.services.notify import manager_emails, manager_user_ids, notify_users, safe_send
 
 logger = logging.getLogger(__name__)
@@ -89,9 +90,10 @@ async def submit_document_audit(
     session: AsyncSession, lease: Lease, document: Document, version: DocumentVersion
 ) -> LeaseClauseAudit:
     """Send the given (validated) document version for a clause audit. The caller commits."""
+    jurisdiction = await resolve_jurisdiction(session, lease)
     content = Path(settings.documents_dir, version.stored_name).read_bytes()
     payload = {
-        "jurisdiction": "NSW",
+        "jurisdiction": jurisdiction,
         "client_ref": str(lease.id),
         "lease": lease_fields(lease),
     }
@@ -107,6 +109,7 @@ async def submit_document_audit(
         status=body["status"],
         model=body["model"],
         engine_version=body["engine_version"],
+        jurisdiction=jurisdiction,
     )
     session.add(row)
     await session.flush()

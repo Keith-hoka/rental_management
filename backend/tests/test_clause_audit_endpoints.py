@@ -6,15 +6,17 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.models import DocumentCategory, DocumentVersion, LeaseClauseAudit
-from tests.test_clause_audit_service import FAKE_JOB, _org_and_user, _seed_document
+from tests.test_clause_audit_service import FAKE_JOB, _org_and_user, _seed_document, _set_state
 from tests.test_portal import make_lease, onboard_tenant
 from tests.test_properties_crud import landlord_headers
 
 
-async def _setup(client, db_session, email, address, tmp_path, monkeypatch):
+async def _setup(client, db_session, email, address, tmp_path, monkeypatch, state="NSW"):
     headers = await landlord_headers(client, email)
     org_id, user_id = await _org_and_user(db_session, email)
     lease_id = uuid.UUID(await make_lease(client, headers, address))
+    if state is not None:
+        await _set_state(db_session, lease_id, state)
     document = await _seed_document(db_session, org_id, lease_id, user_id)
     monkeypatch.setattr(settings, "documents_dir", str(tmp_path))
     Path(tmp_path, "stored.pdf").write_bytes(b"%PDF-1.4 stored")
@@ -193,3 +195,71 @@ async def test_list_shape_and_scoping(client, db_session, tmp_path, monkeypatch,
     other_headers = await landlord_headers(client, "clother@example.com")
     foreign = await client.get(f"/api/v1/leases/{lease_id}/clause-audits", headers=other_headers)
     assert foreign.status_code == 404
+
+
+async def test_post_returns_422_when_state_missing(
+    client, db_session, tmp_path, monkeypatch, compliance_on
+):
+    headers, lease_id, document = await _setup(
+        client,
+        db_session,
+        "cl422c@example.com",
+        "21 Missing St",
+        tmp_path,
+        monkeypatch,
+        state=None,
+    )
+    _fake_create(monkeypatch)
+    response = await client.post(
+        f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=headers
+    )
+    assert response.status_code == 422
+    assert "missing" in response.json()["detail"]
+
+
+async def test_list_reports_jurisdiction_status(
+    client, db_session, tmp_path, monkeypatch, compliance_on
+):
+    headers, lease_id, document = await _setup(
+        client,
+        db_session,
+        "cljurisok@example.com",
+        "22 Status St",
+        tmp_path,
+        monkeypatch,
+        state="Victoria",
+    )
+    _fake_create(monkeypatch)
+    await client.post(
+        f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=headers
+    )
+    listed = (await client.get(f"/api/v1/leases/{lease_id}/clause-audits", headers=headers)).json()
+    assert listed["jurisdiction_status"] == "ok"
+    assert listed["jurisdiction"] == "VIC"
+    assert listed["audits"][0]["jurisdiction"] == "VIC"
+
+    headers, lease_id, _ = await _setup(
+        client,
+        db_session,
+        "cljurismiss@example.com",
+        "23 Status St",
+        tmp_path,
+        monkeypatch,
+        state=None,
+    )
+    listed = (await client.get(f"/api/v1/leases/{lease_id}/clause-audits", headers=headers)).json()
+    assert listed["jurisdiction_status"] == "missing"
+    assert listed["jurisdiction"] is None
+
+    headers, lease_id, _ = await _setup(
+        client,
+        db_session,
+        "cljurisunsup@example.com",
+        "24 Status St",
+        tmp_path,
+        monkeypatch,
+        state="QLD",
+    )
+    listed = (await client.get(f"/api/v1/leases/{lease_id}/clause-audits", headers=headers)).json()
+    assert listed["jurisdiction_status"] == "unsupported"
+    assert listed["jurisdiction"] is None

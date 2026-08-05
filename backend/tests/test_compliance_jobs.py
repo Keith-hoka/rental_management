@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.models import ComplianceAuditQueue, ComplianceSyncState, LeaseAudit, Notification
+from app.services import compliance
 from app.services.compliance import drain_audit_queue, poll_audit_changes
 from tests.conftest import FAKE_AUDIT
 from tests.test_compliance_endpoints import _make_lease
@@ -47,6 +48,28 @@ async def test_drain_skips_rows_at_max_attempts(client, db_session, compliance_o
     await db_session.commit()
     assert await drain_audit_queue(db_session) == 0
     assert (await db_session.execute(select(ComplianceAuditQueue))).first() is not None
+
+
+async def test_drain_drops_unresolvable_rows_without_calling_the_service(db_session, monkeypatch):
+    from tests.test_lease_model import make_lease_row
+
+    called = []
+
+    async def fake_create_audit(payload):
+        called.append(payload)
+        raise AssertionError("service must not be called")
+
+    monkeypatch.setattr(compliance, "create_audit", fake_create_audit)
+    lease = await make_lease_row(db_session)  # property state left unset
+    await compliance.enqueue_audit(db_session, lease.id)
+    await db_session.commit()
+
+    done = await compliance.drain_audit_queue(db_session)
+
+    assert done == 0
+    assert called == []
+    remaining = (await db_session.execute(select(ComplianceAuditQueue))).scalars().all()
+    assert remaining == []
 
 
 def _change(client_ref, new_audit_id, created_at):

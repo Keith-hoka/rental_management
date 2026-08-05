@@ -11,7 +11,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import ComplianceAuditQueue, ComplianceSyncState, Lease, LeaseAudit
+from app.models import ComplianceAuditQueue, ComplianceSyncState, Lease, LeaseAudit, Property
+from app.services.jurisdiction import JurisdictionUnresolved, jurisdiction_for
 from app.services.notify import manager_emails, manager_user_ids, notify_users, safe_send
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,18 @@ async def load_chain(session: AsyncSession, lease: Lease) -> list[Lease]:
     return list(reversed(chain))
 
 
-def chain_to_audit_payload(chain: list[Lease]) -> dict:
+async def resolve_jurisdiction(session: AsyncSession, lease: Lease) -> str:
+    """The audit jurisdiction from the lease's property state; raises when unresolved."""
+    state = (
+        await session.execute(select(Property.state).where(Property.id == lease.property_id))
+    ).scalar_one()
+    code, reason = jurisdiction_for(state)
+    if code is None:
+        raise JurisdictionUnresolved(reason)
+    return code
+
+
+def chain_to_audit_payload(chain: list[Lease], jurisdiction: str) -> dict:
     """The compliance audit request for a renewal chain.
 
     start_date is the tenancy start (chain root): the 12-month first-increase
@@ -110,19 +122,21 @@ def chain_to_audit_payload(chain: list[Lease]) -> dict:
     ]
     if increases:
         lease_body["rent_increases"] = increases
-    return {"jurisdiction": "NSW", "client_ref": str(newest.id), "lease": lease_body}
+    return {"jurisdiction": jurisdiction, "client_ref": str(newest.id), "lease": lease_body}
 
 
 async def run_lease_audit(session: AsyncSession, lease: Lease) -> LeaseAudit:
     """Audit one lease now and store the result. The caller commits."""
+    jurisdiction = await resolve_jurisdiction(session, lease)
     chain = await load_chain(session, lease)
-    body = await create_audit(chain_to_audit_payload(chain))
+    body = await create_audit(chain_to_audit_payload(chain, jurisdiction))
     audit = LeaseAudit(
         lease_id=lease.id,
         organization_id=lease.organization_id,
         audit_id=uuid.UUID(body["id"]),
         as_at=date.fromisoformat(body["as_at"]),
         findings=body["findings"],
+        jurisdiction=jurisdiction,
     )
     session.add(audit)
     await session.flush()
@@ -157,6 +171,13 @@ async def drain_audit_queue(session: AsyncSession) -> int:
         lease = (await session.execute(select(Lease).where(Lease.id == row.lease_id))).scalar_one()
         try:
             await run_lease_audit(session, lease)
+        except JurisdictionUnresolved as exc:
+            logger.info(
+                "Dropping queued audit for lease %s: jurisdiction %s", row.lease_id, exc.reason
+            )
+            await session.delete(row)
+            await session.commit()
+            continue
         except Exception as exc:  # noqa: BLE001 - one bad row must not stop the drain
             row.attempts += 1
             row.last_error = str(exc)
