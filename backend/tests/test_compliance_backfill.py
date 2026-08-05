@@ -4,6 +4,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import date
 
+import pytest
 from sqlalchemy import select
 
 from app.compliance_backfill import fix_jurisdictions, main
@@ -170,6 +171,60 @@ async def test_fix_jurisdictions_dry_run_reports_without_side_effects(db_session
     assert report["clause_resubmitted"] == 1
 
 
+async def test_fix_jurisdictions_execute_isolates_clause_errors(db_session, monkeypatch):
+    """One resubmit failing must not roll back an earlier resubmit's commit."""
+    user = User(email="fixjuris-errors@example.com", hashed_password="x", name="Errors")
+    db_session.add(user)
+    await db_session.flush()
+
+    ok_lease = await make_lease_row(db_session)
+    await _set_state(db_session, ok_lease, "Victoria")
+    ok_document, ok_version = await _seed_document(db_session, ok_lease, user)
+    db_session.add(_clause_audit(ok_lease, ok_document, ok_version, "NSW"))
+
+    failing_lease = await make_lease_row(db_session)
+    await _set_state(db_session, failing_lease, "Victoria")
+    failing_document, failing_version = await _seed_document(db_session, failing_lease, user)
+    db_session.add(_clause_audit(failing_lease, failing_document, failing_version, "NSW"))
+
+    await db_session.commit()
+
+    ok_lease_id = ok_lease.id
+    failing_lease_id = failing_lease.id
+
+    calls = []
+
+    async def fake_submit(session, lease_arg, document_arg, version_arg):
+        calls.append(lease_arg.id)
+        if lease_arg.id == failing_lease_id:
+            raise RuntimeError("submit boom")
+        session.add(_clause_audit(lease_arg, document_arg, version_arg, "VIC"))
+
+    monkeypatch.setattr("app.services.clause_audit.submit_document_audit", fake_submit)
+
+    report = await fix_jurisdictions(db_session, execute=True)
+
+    assert set(calls) == {ok_lease_id, failing_lease_id}
+    assert report["errors"] == [failing_lease_id]
+    assert report["clause_resubmitted"] == 1
+    assert report["skipped_matching"] == 0
+    assert report["deterministic_enqueued"] == 0
+
+    # Prove the successful resubmit is durably committed, not merely pending
+    # in-session: roll back this session's own (now-empty) transaction and
+    # re-query. A row that survives an unrelated rollback was truly committed.
+    await db_session.rollback()
+    persisted = (
+        await db_session.execute(
+            select(LeaseClauseAudit).where(
+                LeaseClauseAudit.lease_id == ok_lease_id,
+                LeaseClauseAudit.jurisdiction == "VIC",
+            )
+        )
+    ).scalar_one_or_none()
+    assert persisted is not None
+
+
 async def test_main_default_runs_existing_backfill(monkeypatch, capsys):
     @asynccontextmanager
     async def fake_sessionmaker():
@@ -241,3 +296,34 @@ async def test_main_fix_jurisdictions_execute_flag(monkeypatch, capsys):
     await main(["--fix-jurisdictions", "--execute"])
 
     assert captured["execute"] is True
+
+
+async def test_main_execute_without_fix_jurisdictions_errors(monkeypatch, capsys):
+    """--execute alone must refuse to run, not silently fall through to backfill()."""
+
+    @asynccontextmanager
+    async def fake_sessionmaker():
+        yield object()
+
+    backfill_calls = []
+    fix_calls = []
+
+    async def fake_backfill(session):
+        backfill_calls.append(session)
+        return 0
+
+    async def fake_fix(session, execute=False):
+        fix_calls.append(execute)
+        return {}
+
+    monkeypatch.setattr("app.compliance_backfill.SessionLocal", lambda: fake_sessionmaker())
+    monkeypatch.setattr("app.compliance_backfill.backfill", fake_backfill)
+    monkeypatch.setattr("app.compliance_backfill.fix_jurisdictions", fake_fix)
+
+    with pytest.raises(SystemExit) as exc_info:
+        await main(["--execute"])
+
+    assert exc_info.value.code == 2
+    assert backfill_calls == []
+    assert fix_calls == []
+    assert "--execute requires --fix-jurisdictions" in capsys.readouterr().err

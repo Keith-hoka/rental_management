@@ -7,6 +7,7 @@ Usage:
 
 import argparse
 import asyncio
+import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -18,6 +19,8 @@ from app.models import Document, Lease, LeaseAudit, LeaseClauseAudit, Property
 from app.services import clause_audit
 from app.services.compliance import enqueue_audit
 from app.services.jurisdiction import jurisdiction_for
+
+logger = logging.getLogger(__name__)
 
 
 async def backfill(session: AsyncSession) -> int:
@@ -41,13 +44,22 @@ async def backfill(session: AsyncSession) -> int:
 async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dict:
     """Find audits stored under a jurisdiction their property no longer maps to.
 
-    Dry-run by default: reports what would change; execute=True enqueues
-    deterministic re-audits and resubmits mismatched clause audits.
+    Dry-run by default: reports what would change. With execute=True, enqueues
+    deterministic re-audits and resubmits mismatched clause audits, committing
+    after each one so a later failure can never undo an earlier success (an
+    accepted clause-audit job must not be orphaned by a rollback). A unit that
+    raises is logged, rolled back on its own, and its lease id recorded in the
+    report's "errors" list instead of aborting the run.
+
+    The driving query selects lease ids rather than full Lease rows: a mid-run
+    rollback expires every ORM object already loaded in the session, and
+    plain attribute access on an expired object raises outside of SQLAlchemy's
+    async machinery, so later iterations re-fetch what they need fresh.
     """
     successor = aliased(Lease)
     rows = (
         await session.execute(
-            select(Lease, Property.state)
+            select(Lease.id, Property.state)
             .join(Property, Property.id == Lease.property_id)
             .where(
                 Lease.end_date >= datetime.now(UTC).date(),
@@ -61,26 +73,36 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
         "skipped_matching": 0,
         "missing": [],
         "unsupported": [],
+        "errors": [],
     }
-    for lease, state in rows:
+    for lease_id, state in rows:
         code, reason = jurisdiction_for(state)
         if reason == "missing":
-            report["missing"].append(lease.id)
+            report["missing"].append(lease_id)
             continue
         if reason == "unsupported":
-            report["unsupported"].append(lease.id)
+            report["unsupported"].append(lease_id)
             continue
         latest_audit = (
             await session.execute(
                 select(LeaseAudit)
-                .where(LeaseAudit.lease_id == lease.id)
+                .where(LeaseAudit.lease_id == lease_id)
                 .order_by(LeaseAudit.created_at.desc())
                 .limit(1)
             )
         ).scalar_one_or_none()
         if latest_audit is not None and latest_audit.jurisdiction != code:
             if execute:
-                await enqueue_audit(session, lease.id)
+                try:
+                    await enqueue_audit(session, lease_id)
+                except Exception as exc:  # noqa: BLE001 - one bad lease must not stop the run
+                    logger.warning(
+                        "fix_jurisdictions: enqueue failed for lease %s: %s", lease_id, exc
+                    )
+                    await session.rollback()
+                    report["errors"].append(lease_id)
+                    continue
+                await session.commit()
             report["deterministic_enqueued"] += 1
         elif latest_audit is not None:
             report["skipped_matching"] += 1
@@ -88,33 +110,45 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
             (
                 await session.execute(
                     select(LeaseClauseAudit)
-                    .where(LeaseClauseAudit.lease_id == lease.id)
+                    .where(LeaseClauseAudit.lease_id == lease_id)
                     .order_by(LeaseClauseAudit.created_at.desc())
                 )
             )
             .scalars()
             .all()
         )
+        clause_specs = [(row.document_id, row.jurisdiction) for row in clause_rows]
         seen_documents: set = set()
-        for clause_row in clause_rows:
-            if clause_row.document_id in seen_documents:
+        for document_id, clause_jurisdiction in clause_specs:
+            if document_id in seen_documents:
                 continue
-            seen_documents.add(clause_row.document_id)
-            if clause_row.jurisdiction == code:
+            seen_documents.add(document_id)
+            if clause_jurisdiction == code:
                 report["skipped_matching"] += 1
                 continue
             if execute:
                 document = (
-                    await session.execute(
-                        select(Document).where(Document.id == clause_row.document_id)
-                    )
+                    await session.execute(select(Document).where(Document.id == document_id))
                 ).scalar_one()
                 version = await clause_audit.latest_version(session, document.id)
                 if version is not None:
-                    await clause_audit.submit_document_audit(session, lease, document, version)
+                    lease = (
+                        await session.execute(select(Lease).where(Lease.id == lease_id))
+                    ).scalar_one()
+                    try:
+                        await clause_audit.submit_document_audit(session, lease, document, version)
+                    except Exception as exc:  # noqa: BLE001 - one bad clause must not stop the run
+                        logger.warning(
+                            "fix_jurisdictions: clause resubmit failed for lease %s document %s: %s",
+                            lease_id,
+                            document_id,
+                            exc,
+                        )
+                        await session.rollback()
+                        report["errors"].append(lease_id)
+                        continue
+                    await session.commit()
             report["clause_resubmitted"] += 1
-    if execute:
-        await session.commit()
     return report
 
 
@@ -130,7 +164,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Perform the fix instead of a dry run (only with --fix-jurisdictions)",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.execute and not args.fix_jurisdictions:
+        parser.error("--execute requires --fix-jurisdictions")
+    return args
 
 
 def _print_report(report: dict) -> None:
