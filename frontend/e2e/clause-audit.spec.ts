@@ -25,6 +25,7 @@ async function openLeaseDetail(page: import("@playwright/test").Page): Promise<v
 
   await page.goto("/app/properties/new");
   await page.getByPlaceholder("Address", { exact: true }).fill("31 Clause Way");
+  await page.getByLabel("State").selectOption("NSW");
   await page.getByRole("button", { name: "Create property" }).click();
   await expect(page).toHaveURL(/\/app\/properties$/);
 
