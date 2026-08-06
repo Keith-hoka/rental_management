@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_roles
-from app.models import LeaseAudit, Membership, Property, Role
+from app.models import LeaseAudit, Membership, Role
 from app.routers.leases import get_owned_lease
 from app.schemas.compliance import ComplianceAuditInfo, ComplianceAuditState
 from app.services import compliance
-from app.services.jurisdiction import jurisdiction_for
+from app.services.jurisdiction import property_jurisdiction
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +71,7 @@ async def latest_audit(
             .limit(1)
         )
     ).scalar_one_or_none()
-    state_value = (
-        await session.execute(select(Property.state).where(Property.id == lease.property_id))
-    ).scalar_one()
-    code, reason = jurisdiction_for(state_value)
+    code, reason = await property_jurisdiction(session, lease.property_id)
     return ComplianceAuditState(
         enabled=compliance.enabled(),
         audit=_info(row) if row is not None else None,

@@ -106,6 +106,7 @@ async def test_lease_clause_audit_round_trip(client, db_session):
         status="pending",
         model="claude-opus-4-8",
         engine_version="1.1.1",
+        jurisdiction="NSW",
     )
     db_session.add(row)
     await db_session.commit()
@@ -282,6 +283,7 @@ async def _seed_in_flight(client, db_session, email, address):
         status="pending",
         model="claude-opus-4-8",
         engine_version="1.1.1",
+        jurisdiction="NSW",
     )
     db_session.add(row)
     await db_session.commit()

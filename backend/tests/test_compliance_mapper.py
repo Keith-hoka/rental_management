@@ -40,6 +40,7 @@ async def test_compliance_tables_round_trip(db_session):
         audit_id=uuid_mod.uuid4(),
         as_at=date(2026, 7, 27),
         findings=[{"rule_id": "nsw.bond_max_4_weeks", "verdict": "green"}],
+        jurisdiction="NSW",
     )
     queue_row = ComplianceAuditQueue(lease_id=lease.id)
     db_session.add_all([audit, queue_row, ComplianceSyncState(key="cursor", value="x")])
