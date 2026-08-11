@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
 const LIVE = !!process.env.CLAUSE_AUDIT_E2E;
-const landlord = `clause-${Date.now()}@example.com`;
 
 function isoDate(offsetDays: number): string {
   const d = new Date();
@@ -14,7 +13,13 @@ const PDF = Buffer.from(
     "professionally cleaned at the end of the tenancy.\n%%EOF",
 );
 
-async function openLeaseDetail(page: import("@playwright/test").Page): Promise<void> {
+async function openLeaseDetail(
+  page: import("@playwright/test").Page,
+  state: string = "NSW",
+): Promise<void> {
+  // Computed per call (not hoisted to module scope) so two LIVE tests in the
+  // same run sign up as distinct organizations.
+  const landlord = `clause-${Date.now()}@example.com`;
   await page.goto("/signup");
   await page.getByPlaceholder("Your name").fill("Clause Owner");
   await page.getByPlaceholder("Organization name").fill("Clause Org");
@@ -25,7 +30,7 @@ async function openLeaseDetail(page: import("@playwright/test").Page): Promise<v
 
   await page.goto("/app/properties/new");
   await page.getByPlaceholder("Address", { exact: true }).fill("31 Clause Way");
-  await page.getByLabel("State").selectOption("NSW");
+  await page.getByLabel("State").selectOption(state);
   await page.getByRole("button", { name: "Create property" }).click();
   await expect(page).toHaveURL(/\/app\/properties$/);
 
@@ -60,5 +65,42 @@ test("run clause audit queues a job for an uploaded lease PDF", async ({ page })
   await expect(page.getByRole("heading", { name: "Clause audit" })).toBeVisible();
   await page.getByRole("button", { name: "Run clause audit" }).first().click();
   await expect(page.getByText("Queued").or(page.getByText("Running..."))).toBeVisible();
+  await expect(page.getByText("General information, not legal advice.").first()).toBeVisible();
+});
+
+test("VIC clause audit shows the standard-form comparison family", async ({ page }) => {
+  test.skip(!LIVE, "requires the local compliance service (set CLAUSE_AUDIT_E2E=1)");
+  // Async job: the backend polls the compliance service for completion on
+  // its own schedule (up to a minute), well past Playwright's default 30s.
+  test.setTimeout(180_000);
+  await openLeaseDetail(page, "VIC");
+
+  await expect(page.getByRole("heading", { name: "Documents", exact: true })).toBeVisible();
+  await page.getByLabel("Title").fill("Signed Lease");
+  await page
+    .locator("label")
+    .filter({ hasText: "Add document" })
+    .locator('input[type="file"]')
+    .setInputFiles({ name: "lease.pdf", mimeType: "application/pdf", buffer: PDF });
+  const docRow = page.locator("li").filter({ hasText: "Signed Lease" });
+  await expect(docRow).toBeVisible();
+
+  await expect(page.getByRole("heading", { name: "Clause audit" })).toBeVisible();
+  const succeeded = page.waitForResponse(async (r) => {
+    if (r.request().method() !== "GET" || !r.url().includes("/clause-audits")) return false;
+    const body = await r.json().catch(() => null);
+    return !!body?.audits?.some((a: { status: string }) => a.status === "succeeded");
+  });
+  await page.getByRole("button", { name: "Run clause audit" }).first().click();
+  const listState: { audits: { status: string; findings: { rule_id: string }[] }[] } = await (
+    await succeeded
+  ).json();
+
+  // The completed VIC audit carries the new standard-form family alongside
+  // the existing prohibited-term findings.
+  const audit = listState.audits.find((a) => a.status === "succeeded");
+  expect(audit?.findings.some((f) => f.rule_id.startsWith("vic.clause.sf_f"))).toBe(true);
+
+  await expect(page.getByText("Standard form comparison").first()).toBeVisible();
   await expect(page.getByText("General information, not legal advice.").first()).toBeVisible();
 });

@@ -30,12 +30,6 @@ const CLAUSE_RULE_LABELS: Record<string, string> = {
   "nsw.clause.specified_contractor_reg":
     "Prohibited term: specified contractor (Reg cl 5, pre-2025)",
   "nsw.clause.utility_provider": "Prohibited term: specific utility provider (Reg cl 5)",
-  "nsw.clause.states_rent_payment": "Required term: rent and payment (s 33)",
-  "nsw.clause.quiet_enjoyment_term": "Required term: quiet enjoyment (s 50)",
-  "nsw.clause.tenant_use_term": "Required term: use of premises (s 51)",
-  "nsw.clause.habitability_term": "Required term: clean and habitable (s 52)",
-  "nsw.clause.repairs_term": "Required term: repairs (s 63)",
-  "nsw.clause.locks_security_term": "Required term: locks and security (s 70)",
   "vic.clause.renter_insurance": "Prohibited term: renter must take out insurance (s 27B)",
   "vic.clause.provider_liability_exemption": "Prohibited term: provider liability exemption (s 27B)",
   "vic.clause.breach_penalty": "Prohibited term: breach penalty or remaining rent (s 27B)",
@@ -54,6 +48,8 @@ const CLAUSE_RULE_LABELS: Record<string, string> = {
   "vic.clause.fixed_break_fees": "Prohibited term: fixed break fees without basis (reg 11)",
 };
 
+const STANDARD_FORM_LABEL = "Standard form comparison";
+
 const FIELD_LABELS: Record<string, string> = {
   rent_amount: "Rent",
   rent_frequency: "Rent frequency",
@@ -69,6 +65,7 @@ const FIELD_LABELS: Record<string, string> = {
 const VERDICT_ORDER: Record<ClauseVerdict, number> = { red: 0, yellow: 1, green: 2, skipped: 3 };
 
 function label(finding: ClauseFinding): string {
+  if (finding.rule_id.includes(".clause.sf_")) return STANDARD_FORM_LABEL;
   return CLAUSE_RULE_LABELS[finding.rule_id] ?? finding.rule_id;
 }
 
@@ -129,7 +126,7 @@ function FindingRow({ finding }: { finding: ClauseFinding }) {
       ) : null}
       {citation ? (
         <p className="text-xs text-muted">
-          {citation.act}, s {citation.section_no} - as at {citation.as_at}
+          {citation.act}, {citation.label ?? `s ${citation.section_no}`} - as at {citation.as_at}
         </p>
       ) : null}
     </li>

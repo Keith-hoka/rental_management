@@ -7,6 +7,7 @@ export type ClauseAuditStatus = "pending" | "running" | "succeeded" | "failed";
 export interface ClauseCitation {
   act: string;
   section_no: string;
+  label?: string;
   as_at: string;
 }
 
