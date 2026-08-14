@@ -11,12 +11,18 @@ from tests.test_portal import make_lease, onboard_tenant
 from tests.test_properties_crud import landlord_headers
 
 
-async def _setup(client, db_session, email, address, tmp_path, monkeypatch, state="NSW"):
+async def _setup(
+    client, db_session, email, address, tmp_path, monkeypatch, state="NSW", consent=True
+):
+    from tests.test_ai_consent_endpoints import enable_clause_audit
+
     headers = await landlord_headers(client, email)
     org_id, user_id = await _org_and_user(db_session, email)
     lease_id = uuid.UUID(await make_lease(client, headers, address))
     if state is not None:
         await _set_state(db_session, lease_id, state)
+    if consent:
+        await enable_clause_audit(db_session, org_id, user_id)
     document = await _seed_document(db_session, org_id, lease_id, user_id)
     monkeypatch.setattr(settings, "documents_dir", str(tmp_path))
     Path(tmp_path, "stored.pdf").write_bytes(b"%PDF-1.4 stored")
@@ -263,3 +269,25 @@ async def test_list_reports_jurisdiction_status(
     listed = (await client.get(f"/api/v1/leases/{lease_id}/clause-audits", headers=headers)).json()
     assert listed["jurisdiction_status"] == "unsupported"
     assert listed["jurisdiction"] is None
+
+
+async def test_post_without_consent_is_403(
+    client, db_session, tmp_path, monkeypatch, compliance_on
+):
+    headers, lease_id, document = await _setup(
+        client,
+        db_session,
+        "clgate@example.com",
+        "12 Gate St",
+        tmp_path,
+        monkeypatch,
+        consent=False,
+    )
+    response = await client.post(
+        f"/api/v1/leases/{lease_id}/documents/{document.id}/clause-audit", headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == {
+        "code": "ai_consent_required",
+        "feature": "clause_audit",
+    }

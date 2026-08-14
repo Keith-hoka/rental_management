@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.core.deps import require_roles
-from app.models import Document, DocumentCategory, LeaseClauseAudit, Membership, Role
+from app.core.deps import require_ai_consent, require_roles
+from app.models import AiFeature, Document, DocumentCategory, LeaseClauseAudit, Membership, Role
 from app.routers.leases import get_owned_lease
 from app.schemas.clause_audit import ClauseAuditInfo, ClauseAuditListState
 from app.services import clause_audit, compliance
@@ -48,6 +48,7 @@ async def run_clause_audit(
     lease_id: uuid.UUID,
     document_id: uuid.UUID,
     membership: Membership = Depends(manager),
+    _consent: Membership = Depends(require_ai_consent(AiFeature.clause_audit)),
     session: AsyncSession = Depends(get_session),
 ) -> ClauseAuditInfo:
     """Send the document's latest version for an async clause audit."""

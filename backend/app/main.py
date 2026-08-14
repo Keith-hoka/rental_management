@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.scheduler import scheduler, start_scheduler
+from app.routers.ai_consents import router as ai_consents_router
 from app.routers.auth import router as auth_router
 from app.routers.calendar import router as calendar_router
 from app.routers.clause_audits import router as clause_audits_router
@@ -48,6 +49,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(ai_consents_router)
 app.include_router(auth_router)
 app.include_router(calendar_router)
 app.include_router(clause_audits_router)
