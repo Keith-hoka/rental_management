@@ -1,3 +1,4 @@
+from app.models.ai_consent import AiFeature, AiFeatureConsent
 from app.models.calendar_event import CalendarEvent
 from app.models.charge import Charge
 from app.models.charge_reminder import ChargeReminder
@@ -29,6 +30,8 @@ from app.models.property import Property, PropertyStatus, PropertyType
 from app.models.user import User
 
 __all__ = [
+    "AiFeature",
+    "AiFeatureConsent",
     "CalendarEvent",
     "Charge",
     "ChargeReminder",
