@@ -61,11 +61,11 @@ new AI processing stops.
   403 with a machine-readable body (`{"detail": {"code":
   "ai_consent_required", "feature": "clause_audit"}}`) when the feature
   is not enabled. Applied to the clause-audit submit endpoints.
-- **The scheduled path is gated too**: `drain_audit_queue`
-  (`app/services/compliance.py`, invoked by the scheduler) checks consent
-  per queued item's organization; unconsented items are dropped without
-  retry with a skip reason surfaced in the item's summary, following the
-  existing unresolvable-jurisdiction skip convention.
+- **The endpoint is the only LLM path** (verified against the code):
+  `drain_audit_queue` drains deterministic audits (no LLM, exempt by
+  design) and the scheduled `poll_clause_audits` only advances
+  already-submitted jobs — gating it would strand in-flight work. No
+  scheduler changes.
 - Toggle endpoints: `GET /api/ai-consents` (any member — read the current
   state and disclosure version for display) and
   `POST /api/ai-consents/{feature}` (body `{"enabled": bool}`,
@@ -76,9 +76,13 @@ new AI processing stops.
 
 ## Disclosure content and frontend
 
-- The disclosure is versioned markdown in the repo
-  (`frontend/src/content/ai-disclosure.md` with a `version:` line the
-  backend serves as the current version). Content covers four points:
+- The disclosure version has one owner: the backend constant
+  `AI_DISCLOSURE_VERSION` (`app/services/ai_consent.py`, e.g.
+  `"2026-08-14"`), served by the consent API and stamped into every
+  consent event. The disclosure copy lives in a frontend content module
+  (`frontend/src/content/aiDisclosure.tsx`) rendered on the settings
+  page, which displays the version from the API. Content covers four
+  points:
   what is sent (property attributes, rent figures, dates, lease document
   text), to whom (Anthropic, with an OpenAI backup, via our compliance
   service), **what is never sent (tenant names, emails, phone numbers,
