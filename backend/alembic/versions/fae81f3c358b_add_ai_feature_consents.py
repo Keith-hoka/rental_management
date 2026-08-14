@@ -22,6 +22,7 @@ def upgrade() -> None:
     op.create_table(
         "ai_feature_consents",
         sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("seq", sa.BigInteger(), sa.Identity(), nullable=False),
         sa.Column("organization_id", sa.Uuid(), nullable=False),
         sa.Column(
             "feature",
@@ -40,6 +41,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"]),
         sa.ForeignKeyConstraint(["acted_by"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("seq"),
     )
     op.create_index(
         op.f("ix_ai_feature_consents_organization_id"),

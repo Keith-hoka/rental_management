@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Identity, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -19,6 +19,7 @@ class AiFeatureConsent(Base):
     __tablename__ = "ai_feature_consents"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     feature: Mapped[AiFeature] = mapped_column(Enum(AiFeature))
     enabled: Mapped[bool] = mapped_column()

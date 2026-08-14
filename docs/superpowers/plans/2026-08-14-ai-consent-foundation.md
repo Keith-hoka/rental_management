@@ -23,9 +23,10 @@ app router + Playwright (frontend), pytest.
   commands run from `backend/`, frontend from `frontend/`.
 - Feature enum values exactly: `clause_audit`, `rent_ai` (reserved,
   gate-able but no endpoint uses it yet).
-- Consent state: newest event by `created_at` per (organization,
-  feature); **no rows means not consented**. Disabling never deletes
-  data; completed audit results stay readable.
+- Consent state: newest event by the `seq` identity column (amended
+  2026-08-14) per (organization, feature); **no rows means not
+  consented**. Disabling never deletes data; completed audit results
+  stay readable.
 - Only the `landlord` role toggles consent; `property_manager` and
   `tenant` get 403 from the toggle endpoint. Reads are open to any
   member.

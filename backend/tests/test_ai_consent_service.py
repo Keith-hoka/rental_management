@@ -48,3 +48,11 @@ async def test_features_are_independent(client, db_session):
     await record_consent(db_session, org_id, AiFeature.clause_audit, True, user_id)
     await db_session.commit()
     assert await feature_enabled(db_session, org_id, AiFeature.rent_ai) is False
+
+
+async def test_same_transaction_toggle_newest_wins(client, db_session):
+    org_id, user_id = await _org(client, db_session, "consent4@example.com")
+    await record_consent(db_session, org_id, AiFeature.clause_audit, True, user_id)
+    await record_consent(db_session, org_id, AiFeature.clause_audit, False, user_id)
+    await db_session.commit()
+    assert await feature_enabled(db_session, org_id, AiFeature.clause_audit) is False

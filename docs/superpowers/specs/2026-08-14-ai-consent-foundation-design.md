@@ -45,9 +45,11 @@ New table `ai_feature_consents` — an append-only event stream:
 - `acted_by` (fk users.id), `created_at` (server default now)
 
 Current state of a feature = the newest event's `enabled` for that
-(organization, feature), ordered by `created_at` (human toggle rates make
-timestamp ties a non-concern); **no rows means not consented**, which is
-exactly the migration semantics for existing organizations — no backfill.
+(organization, feature), ordered by a monotonic `seq` identity column
+(amended 2026-08-14: review reproduced identical created_at timestamps for
+two events in one transaction; `created_at` is informational); **no rows
+means not consented**, which is exactly the migration semantics for
+existing organizations — no backfill.
 Every toggle inserts a new row, so who enabled/disabled what, when, and
 against which disclosure version is answerable from the table alone.
 Disabling never deletes data: completed audit results stay readable; only

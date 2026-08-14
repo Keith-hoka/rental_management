@@ -16,7 +16,7 @@ async def feature_enabled(session: AsyncSession, organization_id, feature: AiFea
                 AiFeatureConsent.organization_id == organization_id,
                 AiFeatureConsent.feature == feature,
             )
-            .order_by(AiFeatureConsent.created_at.desc())
+            .order_by(AiFeatureConsent.seq.desc())
             .limit(1)
         )
     ).scalar_one_or_none()
@@ -36,6 +36,7 @@ async def record_consent(
     enabled: bool,
     acted_by,
 ) -> AiFeatureConsent:
+    """Append one consent event; flushed so the row is queryable - the caller commits."""
     event = AiFeatureConsent(
         organization_id=organization_id,
         feature=feature,
