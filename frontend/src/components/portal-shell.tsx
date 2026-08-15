@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/app/messages", label: "Messages" },
   { href: "/app/profile", label: "Profile" },
   { href: "/app/change-password", label: "Change password" },
+  { href: "/app/settings/ai", label: "AI settings" },
 ];
 
 const QUIET = "rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-surface-2 hover:text-text";

@@ -277,6 +277,7 @@ export function ClauseAuditSection({
           )}
         </p>
       )}
+      {consented === false ? <AiConsentPrompt /> : null}
       <div className="space-y-4">
         {leaseDocuments.map((document) => {
           const audits = byDocument.get(document.id) ?? [];
@@ -300,7 +301,6 @@ export function ClauseAuditSection({
                   </Button>
                 ) : null}
               </div>
-              {consented === false ? <AiConsentPrompt /> : null}
               {!isPdf ? (
                 <p className="text-xs text-muted">Only PDF documents can be audited.</p>
               ) : null}
