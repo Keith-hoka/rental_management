@@ -24,6 +24,7 @@ const MANAGE = [
 const SETTINGS = [
   { href: "/app/profile", label: "Profile" },
   { href: "/app/change-password", label: "Change password" },
+  { href: "/app/settings/ai", label: "AI settings" },
 ];
 
 function NavLink({

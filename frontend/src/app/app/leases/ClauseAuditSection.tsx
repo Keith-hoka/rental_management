@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card } from "@/components/ui";
+import { getAiConsents } from "@/lib/aiConsent";
 import {
   listClauseAudits,
   runClauseAudit,
@@ -78,6 +80,17 @@ function skippedDetail(finding: ClauseFinding): string {
     return `Statutory basis not in force at the audit date (${reason}).`;
   }
   return finding.summary || reason;
+}
+
+function AiConsentPrompt() {
+  return (
+    <div data-testid="ai-consent-card" className="space-y-1 text-sm text-muted">
+      <p>AI features are disabled. A landlord can enable them in Settings.</p>
+      <Link className="underline" href="/app/settings/ai">
+        Open AI settings
+      </Link>
+    </div>
+  );
 }
 
 function StatusChip({ audit }: { audit: ClauseAudit }) {
@@ -178,9 +191,20 @@ export function ClauseAuditSection({
   documents: DocumentInfo[];
 }) {
   const [state, setState] = useState<ClauseAuditListState | null>(null);
+  const [consented, setConsented] = useState<boolean | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const leaseDocuments = documents.filter((d) => d.category === "lease");
+
+  useEffect(() => {
+    let active = true;
+    getAiConsents()
+      .then((consent) => active && setConsented(consent.features.clause_audit === true))
+      .catch(() => active && setConsented(false));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // A response for a previous lease must never land in this lease's state.
   const activeLease = useRef(leaseId);
@@ -266,14 +290,17 @@ export function ClauseAuditSection({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-text">{document.title}</span>
                 {latest ? <StatusChip audit={latest} /> : null}
-                <Button
-                  variant="secondary"
-                  disabled={!isPdf || running || submitting[document.id] || blocked}
-                  onClick={() => void run(document.id)}
-                >
-                  {submitting[document.id] ? "Submitting..." : "Run clause audit"}
-                </Button>
+                {consented ? (
+                  <Button
+                    variant="secondary"
+                    disabled={!isPdf || running || submitting[document.id] || blocked}
+                    onClick={() => void run(document.id)}
+                  >
+                    {submitting[document.id] ? "Submitting..." : "Run clause audit"}
+                  </Button>
+                ) : null}
               </div>
+              {consented === false ? <AiConsentPrompt /> : null}
               {!isPdf ? (
                 <p className="text-xs text-muted">Only PDF documents can be audited.</p>
               ) : null}

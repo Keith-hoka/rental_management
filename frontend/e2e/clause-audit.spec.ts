@@ -28,6 +28,13 @@ async function openLeaseDetail(
   await page.getByRole("button", { name: "Sign up" }).click();
   await expect(page.getByTestId("welcome")).toBeVisible();
 
+  // Consent defaults off; enable clause audit before any audit interaction
+  // (same actions as ai-consent.spec.ts's first test).
+  await page.goto("/app/settings/ai");
+  const consentToggle = page.getByRole("switch", { name: /clause audit/i });
+  await consentToggle.click();
+  await expect(consentToggle).toBeChecked();
+
   await page.goto("/app/properties/new");
   await page.getByPlaceholder("Address", { exact: true }).fill("31 Clause Way");
   await page.getByLabel("State").selectOption(state);
