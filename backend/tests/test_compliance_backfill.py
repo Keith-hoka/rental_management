@@ -147,9 +147,16 @@ async def test_fix_jurisdictions_resubmits_mismatched_clause_audit(db_session, m
     assert report["skipped_no_consent"] == 0
 
 
-async def test_fix_jurisdictions_skips_resubmit_without_consent(db_session, monkeypatch):
-    """The backfill must not call the LLM path for an organization with no consent."""
-    user = User(email="fixjuris-noconsent@example.com", hashed_password="x", name="No Consent")
+@pytest.mark.parametrize("execute", [False, True])
+async def test_fix_jurisdictions_skips_resubmit_without_consent(db_session, monkeypatch, execute):
+    """No LLM path runs for an unconsented organization, in either mode.
+
+    A dry run must preview this skip too: it must not count the document
+    under "clause_resubmitted" only for --execute to skip it moments later.
+    """
+    user = User(
+        email=f"fixjuris-noconsent-{execute}@example.com", hashed_password="x", name="No Consent"
+    )
     db_session.add(user)
     await db_session.flush()
 
@@ -167,7 +174,7 @@ async def test_fix_jurisdictions_skips_resubmit_without_consent(db_session, monk
 
     monkeypatch.setattr("app.services.clause_audit.submit_document_audit", fake_submit)
 
-    report = await fix_jurisdictions(db_session, execute=True)
+    report = await fix_jurisdictions(db_session, execute=execute)
 
     assert calls == []
     assert report["skipped_no_consent"] == 1
@@ -225,6 +232,7 @@ async def test_fix_jurisdictions_dry_run_reports_without_side_effects(db_session
     document, version = await _seed_document(db_session, lease, user)
     db_session.add(_clause_audit(lease, document, version, "NSW"))
     await db_session.commit()
+    await enable_clause_audit(db_session, lease.organization_id, user.id)
 
     enqueued = []
     submitted = []

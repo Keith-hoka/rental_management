@@ -120,7 +120,8 @@ new AI processing stops.
 - Per-user consent, consent expiry, or re-consent on disclosure version
   bumps (a version bump simply shows the new text; forcing re-consent is
   a product decision deferred until a material change happens).
-- Tenant-facing consent flows — tenant personal data never enters
-  prompts by design, so tenant notice belongs to the future privacy
+- Tenant-facing consent flows — tenant personal data reaches the
+  provider only inside landlord-uploaded documents (never in
+  app-assembled data), so tenant notice belongs to the future privacy
   policy, not this gate.
 - Compliance-service changes: the gate lives entirely in the SaaS.

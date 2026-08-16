@@ -69,12 +69,12 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
     documents actually resubmitted (execute) or that would be (dry run), and
     documents that cannot be resubmitted are counted under their skip reason
     instead - so the only dry-run/execute difference is units that fail at
-    submit time, which land in "errors". The one exception is
-    "skipped_no_consent": a clause resubmit is an LLM call, so execute mode
-    checks the organization's clause-audit consent immediately before
-    submitting and skips without calling out when it is missing; a dry run
-    never reaches that check and still counts the document under
-    "clause_resubmitted".
+    submit time, which land in "errors". This includes "skipped_no_consent":
+    a clause resubmit is an LLM call, so both modes check the organization's
+    clause-audit consent before a document counts as resubmittable, and skip
+    it without calling out when consent is missing - a dry run's
+    "clause_resubmitted" therefore previews exactly what --execute would
+    attempt, never more.
 
     The driving query selects lease ids rather than full Lease rows: a mid-run
     rollback expires every ORM object already loaded in the session, and
@@ -84,7 +84,7 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
     successor = aliased(Lease)
     rows = (
         await session.execute(
-            select(Lease.id, Property.state)
+            select(Lease.id, Property.state, Lease.organization_id)
             .join(Property, Property.id == Lease.property_id)
             .where(
                 Lease.end_date >= datetime.now(UTC).date(),
@@ -104,7 +104,7 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
         "unsupported": [],
         "errors": [],
     }
-    for lease_id, state in rows:
+    for lease_id, state, organization_id in rows:
         code, reason = jurisdiction_for(state)
         if reason == "missing":
             report["missing"].append(lease_id)
@@ -171,15 +171,13 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
                 if version is None:
                     report["skipped_no_version"] += 1
                     continue
+                if not await feature_enabled(session, organization_id, AiFeature.clause_audit):
+                    report["skipped_no_consent"] += 1
+                    continue
                 if execute:
                     lease = (
                         await session.execute(select(Lease).where(Lease.id == lease_id))
                     ).scalar_one()
-                    if not await feature_enabled(
-                        session, lease.organization_id, AiFeature.clause_audit
-                    ):
-                        report["skipped_no_consent"] += 1
-                        continue
                     document = (
                         await session.execute(select(Document).where(Document.id == document_id))
                     ).scalar_one()

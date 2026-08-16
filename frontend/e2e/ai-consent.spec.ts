@@ -128,3 +128,20 @@ test("unconsented lease page shows the enable prompt instead of the audit button
   const card = page.getByTestId("ai-consent-card");
   await expect(card.getByRole("link", { name: /settings/i })).toBeVisible();
 });
+
+test("consented lease page shows the audit button instead of the enable prompt", async ({
+  page,
+}) => {
+  await createLeaseWithDocument(page);
+  const leaseUrl = page.url();
+
+  await page.goto("/app/settings/ai");
+  const toggle = page.getByRole("switch", { name: /clause audit/i });
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+
+  await page.goto(leaseUrl);
+  await expect(page.getByRole("button", { name: "Run clause audit" })).toBeVisible();
+  await expect(page.getByTestId("ai-consent-card")).not.toBeVisible();
+});
