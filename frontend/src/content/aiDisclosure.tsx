@@ -9,7 +9,7 @@ const SECTIONS = [
   },
   {
     heading: "What we never send",
-    body: "Tenant names, tenant emails, phone numbers, and co-tenant details are never sent to any AI provider.",
+    body: "Tenant names, emails, phone numbers, and co-tenant details are never sent as part of the structured data we assemble - property attributes, rent figures, dates. Lease documents you upload for audit are sent as-is, though, so any personal details written in the document itself will still reach the provider.",
   },
   {
     heading: "About the results",

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card } from "@/components/ui";
+import { ApiError } from "@/lib/api";
 import { getAiConsents } from "@/lib/aiConsent";
 import {
   listClauseAudits,
@@ -256,6 +257,10 @@ export function ClauseAuditSection({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Clause audit failed to start";
       setErrors((prev) => ({ ...prev, [documentId]: message }));
+      // A stale tab can still show the button after consent was revoked
+      // elsewhere; drop to the prompt card instead of leaving it in place.
+      const detail = error instanceof ApiError ? (error.detail as { code?: string }) : null;
+      if (detail?.code === "ai_consent_required") setConsented(false);
     } finally {
       setSubmitting((prev) => ({ ...prev, [documentId]: false }));
     }

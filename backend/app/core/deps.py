@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.security import decode_token
-from app.models import Membership, Role, User
+from app.models import AiFeature, Membership, Role, User
 from app.services.ai_consent import feature_enabled
 
 bearer = HTTPBearer(auto_error=False)
@@ -57,7 +57,7 @@ def require_roles(*roles: Role):
     return checker
 
 
-def require_ai_consent(feature):
+def require_ai_consent(feature: AiFeature):
     """Dependency factory: 403 unless the organization enabled this AI feature."""
 
     async def checker(

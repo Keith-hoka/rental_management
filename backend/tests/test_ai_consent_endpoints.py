@@ -1,5 +1,6 @@
 from app.models import AiFeature
 from app.services.ai_consent import AI_DISCLOSURE_VERSION, record_consent
+from tests.test_invitation_accept import create_invite
 from tests.test_portal import make_lease, onboard_tenant
 from tests.test_properties_crud import landlord_headers
 
@@ -41,6 +42,20 @@ async def test_non_landlord_cannot_toggle(client, db_session):
     )
     response = await client.post(
         "/api/ai-consents/clause_audit", json={"enabled": True}, headers=tenant_headers
+    )
+    assert response.status_code == 403
+
+
+async def test_property_manager_cannot_toggle(client, db_session):
+    headers = await landlord_headers(client, "aic5@example.com")
+    token = await create_invite(client, db_session, headers, email="aic5pm@example.com")
+    accepted = await client.post(
+        "/api/v1/invitations/accept",
+        json={"token": token, "name": "PM", "password": "pmsecret1"},
+    )
+    pm_headers = {"Authorization": f"Bearer {accepted.json()['access_token']}"}
+    response = await client.post(
+        "/api/ai-consents/clause_audit", json={"enabled": True}, headers=pm_headers
     )
     assert response.status_code == 403
 

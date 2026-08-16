@@ -18,6 +18,7 @@ from app.models import (
     User,
 )
 from app.services import clause_audit
+from tests.test_ai_consent_endpoints import enable_clause_audit
 from tests.test_lease_model import make_lease_row
 
 
@@ -128,6 +129,7 @@ async def test_fix_jurisdictions_resubmits_mismatched_clause_audit(db_session, m
     db_session.add(_clause_audit(matching_lease, matching_document, matching_version, "VIC"))
 
     await db_session.commit()
+    await enable_clause_audit(db_session, mismatched_lease.organization_id, user.id)
 
     calls = []
 
@@ -142,6 +144,34 @@ async def test_fix_jurisdictions_resubmits_mismatched_clause_audit(db_session, m
     assert report["clause_resubmitted"] == 1
     assert report["skipped_matching_clause"] == 1
     assert report["skipped_matching_audits"] == 0
+    assert report["skipped_no_consent"] == 0
+
+
+async def test_fix_jurisdictions_skips_resubmit_without_consent(db_session, monkeypatch):
+    """The backfill must not call the LLM path for an organization with no consent."""
+    user = User(email="fixjuris-noconsent@example.com", hashed_password="x", name="No Consent")
+    db_session.add(user)
+    await db_session.flush()
+
+    mismatched_lease = await make_lease_row(db_session)
+    await _set_state(db_session, mismatched_lease, "Victoria")
+    document, version = await _seed_document(db_session, mismatched_lease, user)
+    db_session.add(_clause_audit(mismatched_lease, document, version, "NSW"))
+
+    await db_session.commit()
+
+    calls = []
+
+    async def fake_submit(session, lease_arg, document_arg, version_arg):
+        calls.append((lease_arg.id, document_arg.id, version_arg.id))
+
+    monkeypatch.setattr("app.services.clause_audit.submit_document_audit", fake_submit)
+
+    report = await fix_jurisdictions(db_session, execute=True)
+
+    assert calls == []
+    assert report["skipped_no_consent"] == 1
+    assert report["clause_resubmitted"] == 0
 
 
 async def test_fix_jurisdictions_skips_resubmit_when_latest_clause_audit_already_matches(
@@ -295,6 +325,7 @@ async def test_fix_jurisdictions_isolates_clause_read_errors(db_session, monkeyp
     db_session.add(_clause_audit(ok_lease, ok_document, ok_version, "NSW"))
 
     await db_session.commit()
+    await enable_clause_audit(db_session, ok_lease.organization_id, user.id)
     failing_document_id = failing_document.id
     failing_lease_id = failing_lease.id
     ok_lease_id = ok_lease.id
@@ -338,6 +369,8 @@ async def test_fix_jurisdictions_execute_isolates_clause_errors(db_session, monk
     db_session.add(_clause_audit(failing_lease, failing_document, failing_version, "NSW"))
 
     await db_session.commit()
+    await enable_clause_audit(db_session, ok_lease.organization_id, user.id)
+    await enable_clause_audit(db_session, failing_lease.organization_id, user.id)
 
     ok_lease_id = ok_lease.id
     failing_lease_id = failing_lease.id

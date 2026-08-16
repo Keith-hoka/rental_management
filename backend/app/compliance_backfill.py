@@ -15,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.core.db import SessionLocal
-from app.models import Document, Lease, LeaseAudit, LeaseClauseAudit, Property
+from app.models import AiFeature, Document, Lease, LeaseAudit, LeaseClauseAudit, Property
 from app.services import clause_audit
+from app.services.ai_consent import feature_enabled
 from app.services.compliance import enqueue_audit
 from app.services.jurisdiction import jurisdiction_for
 
@@ -68,7 +69,12 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
     documents actually resubmitted (execute) or that would be (dry run), and
     documents that cannot be resubmitted are counted under their skip reason
     instead - so the only dry-run/execute difference is units that fail at
-    submit time, which land in "errors".
+    submit time, which land in "errors". The one exception is
+    "skipped_no_consent": a clause resubmit is an LLM call, so execute mode
+    checks the organization's clause-audit consent immediately before
+    submitting and skips without calling out when it is missing; a dry run
+    never reaches that check and still counts the document under
+    "clause_resubmitted".
 
     The driving query selects lease ids rather than full Lease rows: a mid-run
     rollback expires every ORM object already loaded in the session, and
@@ -93,6 +99,7 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
         "skipped_matching_clause": 0,
         "skipped_no_version": 0,
         "skipped_in_flight": 0,
+        "skipped_no_consent": 0,
         "missing": [],
         "unsupported": [],
         "errors": [],
@@ -165,11 +172,16 @@ async def fix_jurisdictions(session: AsyncSession, execute: bool = False) -> dic
                     report["skipped_no_version"] += 1
                     continue
                 if execute:
-                    document = (
-                        await session.execute(select(Document).where(Document.id == document_id))
-                    ).scalar_one()
                     lease = (
                         await session.execute(select(Lease).where(Lease.id == lease_id))
+                    ).scalar_one()
+                    if not await feature_enabled(
+                        session, lease.organization_id, AiFeature.clause_audit
+                    ):
+                        report["skipped_no_consent"] += 1
+                        continue
+                    document = (
+                        await session.execute(select(Document).where(Document.id == document_id))
                     ).scalar_one()
                     await clause_audit.submit_document_audit(session, lease, document, version)
                     await session.commit()

@@ -5,12 +5,27 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost
 const BASE_URL = API_BASE_URL;
 const REFRESH_PATH = "/api/v1/auth/refresh";
 
+/** A readable message for a FastAPI `detail` body, which is a string or an object. */
+function detailMessage(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "code" in detail) {
+    const code = (detail as { code?: unknown }).code;
+    if (code === "ai_consent_required") {
+      return "AI features are disabled for your organization. A landlord can enable them in Settings.";
+    }
+  }
+  return JSON.stringify(detail);
+}
+
 export class ApiError extends Error {
+  detail: unknown;
+
   constructor(
     public status: number,
-    message: string,
+    detail: unknown,
   ) {
-    super(message);
+    super(detailMessage(detail));
+    this.detail = detail;
   }
 }
 

@@ -63,11 +63,12 @@ new AI processing stops.
   403 with a machine-readable body (`{"detail": {"code":
   "ai_consent_required", "feature": "clause_audit"}}`) when the feature
   is not enabled. Applied to the clause-audit submit endpoints.
-- **The endpoint is the only LLM path** (verified against the code):
-  `drain_audit_queue` drains deterministic audits (no LLM, exempt by
-  design) and the scheduled `poll_clause_audits` only advances
-  already-submitted jobs — gating it would strand in-flight work. No
-  scheduler changes.
+- **Two LLM paths exist and both are gated: the submit endpoint and the
+  operator backfill `fix_jurisdictions --execute`** (missed by the
+  original verification, caught in final review): `drain_audit_queue`
+  drains deterministic audits (no LLM, exempt by design) and the
+  scheduled `poll_clause_audits` only advances already-submitted jobs —
+  gating it would strand in-flight work. No scheduler changes.
 - Toggle endpoints: `GET /api/ai-consents` (any member — read the current
   state and disclosure version for display) and
   `POST /api/ai-consents/{feature}` (body `{"enabled": bool}`,
@@ -88,8 +89,11 @@ new AI processing stops.
   what is sent (property attributes, rent figures, dates, lease document
   text), to whom (Anthropic, with an OpenAI backup, via our compliance
   service), **what is never sent (tenant names, emails, phone numbers,
-  co-tenant details — this line doubles as the implementation contract
-  binding the future rent-AI prompts)**, and the nature of results
+  co-tenant details never appear in the structured data the app
+  assembles — this line doubles as the implementation contract binding
+  the future rent-AI prompts; uploaded lease documents are transmitted
+  verbatim, so personal details written into the document itself are
+  not covered by this guarantee)**, and the nature of results
   (general information, not legal advice).
 - New page `app/settings/ai`: renders the disclosure and per-feature
   toggles. Landlords can switch; other roles see read-only state. Nav
@@ -104,8 +108,7 @@ new AI processing stops.
 
 - Backend unit tests: consent state machine (no rows -> disabled; toggle
   sequence -> newest wins; disclosure version recorded), gate 403 body,
-  drain skip for unconsented organizations, role enforcement on the POST
-  (property_manager and tenant get 403).
+  role enforcement on the POST (property_manager and tenant get 403).
 - Frontend Playwright e2e: landlord enables clause audit (card ->
   settings -> toggle -> submit control appears); disable flips the UI
   back; non-landlord sees read-only state.
