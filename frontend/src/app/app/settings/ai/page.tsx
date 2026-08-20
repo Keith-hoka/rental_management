@@ -9,29 +9,38 @@ import { PortalShell } from "@/components/portal-shell";
 import { useShell } from "@/components/use-shell";
 import { Card, PageHeader } from "@/components/ui";
 
-const FEATURES: { key: string; label: string }[] = [
+const FEATURES: { key: string; label: string; description?: string }[] = [
   { key: "clause_audit", label: "Clause audit" },
-  { key: "rent_ai", label: "Rent AI (coming soon)" },
+  {
+    key: "rent_ai",
+    label: "Rent AI",
+    description: "Suggests a renewal rent using recent rental market data and the property's rent-increase rules.",
+  },
 ];
 
 function FeatureSwitch({
   id,
   label,
+  description,
   checked,
   disabled,
   onToggle,
 }: {
   id: string;
   label: string;
+  description?: string;
   checked: boolean;
   disabled: boolean;
   onToggle: () => void;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-border py-3 last:border-b-0">
-      <span id={id} className="text-sm font-medium text-text">
-        {label}
-      </span>
+      <div>
+        <span id={id} className="text-sm font-medium text-text">
+          {label}
+        </span>
+        {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
+      </div>
       <button
         type="button"
         role="switch"
@@ -118,6 +127,7 @@ export default function AiSettingsPage() {
               key={feature.key}
               id={`ai-feature-${feature.key}`}
               label={feature.label}
+              description={feature.description}
               checked={consent?.features[feature.key] ?? false}
               disabled={!isLandlord || consent === null || pending === feature.key}
               onToggle={() =>
