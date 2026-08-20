@@ -25,6 +25,7 @@ from app.routers.payments import router as payments_router
 from app.routers.portal import router as portal_router
 from app.routers.properties import router as properties_router
 from app.routers.rent import router as rent_router
+from app.routers.rent_suggestions import router as rent_suggestions_router
 from app.routers.reports import router as reports_router
 from app.routers.search import router as search_router
 from app.routers.stats import router as stats_router
@@ -60,6 +61,7 @@ app.include_router(expenses_router)
 app.include_router(inspections_router)
 app.include_router(properties_router)
 app.include_router(rent_router)
+app.include_router(rent_suggestions_router)
 app.include_router(invitations_router)
 app.include_router(leases_router)
 app.include_router(maintenance_router)

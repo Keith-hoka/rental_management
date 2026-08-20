@@ -11,6 +11,12 @@ async def enable_clause_audit(db_session, org_id, user_id):
     await db_session.commit()
 
 
+async def enable_rent_ai(db_session, org_id, user_id):
+    """Test helper: consent an organization to rent AI suggestions."""
+    await record_consent(db_session, org_id, AiFeature.rent_ai, True, user_id)
+    await db_session.commit()
+
+
 async def test_get_defaults_all_off(client, db_session):
     headers = await landlord_headers(client, "aic1@example.com")
     response = await client.get("/api/ai-consents", headers=headers)

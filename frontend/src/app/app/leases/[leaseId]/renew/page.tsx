@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { getLease, renewLease, type Lease, type LeaseFrequency } from "@/lib/leases";
+import { getRentSuggestion, type RentSuggestion } from "@/lib/rentSuggestion";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
+import { RentSuggestionCard } from "./RentSuggestionCard";
 
 /** The day after an ISO date. The overlap check is inclusive, so a renewal
  * cannot start on the day the old lease ends. */
@@ -15,6 +17,25 @@ function dayAfter(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+/** A weekly rent expressed in the lease's own payment frequency, rounded to
+ * whole dollars - the inverse of the compliance service's own conversion. */
+function toFrequencyAmount(weekly: number, frequency: LeaseFrequency): number {
+  if (frequency === "fortnightly") return Math.round((weekly * 52) / 26);
+  if (frequency === "monthly") return Math.round((weekly * 52) / 12);
+  return Math.round(weekly);
+}
+
+function AiConsentPrompt() {
+  return (
+    <div data-testid="ai-consent-card" className="space-y-1 text-sm text-muted">
+      <p>AI features are disabled. A landlord can enable them in Settings.</p>
+      <Link className="underline" href="/app/settings/ai">
+        Open AI settings
+      </Link>
+    </div>
+  );
 }
 
 export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: string }> }) {
@@ -33,6 +54,10 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
   const [breakFee, setBreakFee] = useState<number | null>(null);
   const [noticeDays, setNoticeDays] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<RentSuggestion | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [consentBlocked, setConsentBlocked] = useState(false);
 
   useEffect(() => {
     if (!me) return;
@@ -79,6 +104,28 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
     }
   }
 
+  async function suggestRent() {
+    setSuggestionError(null);
+    setConsentBlocked(false);
+    setSuggesting(true);
+    try {
+      setSuggestion(await getRentSuggestion(leaseId, startDate));
+    } catch (err) {
+      const detail = err instanceof ApiError ? (err.detail as { code?: string } | null) : null;
+      if (detail?.code === "ai_consent_required") {
+        setConsentBlocked(true);
+      } else {
+        setSuggestionError("Suggestion unavailable, try again.");
+      }
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function useSuggestedRent(weekly: number) {
+    setRent(toFrequencyAmount(weekly, frequency));
+  }
+
   if (!me) return null;
   if (!lease)
     return (
@@ -123,6 +170,19 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
                 />
               </Field>
             </div>
+            {/* A plain sibling, not nested in the Rent Field: Field wraps its
+                contents in one <label>, and a second interactive control
+                inside it breaks the implicit "Rent" label association. */}
+            <div className="self-end">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!startDate || suggesting}
+                onClick={() => void suggestRent()}
+              >
+                {suggesting ? "Suggesting..." : "Suggest rent"}
+              </Button>
+            </div>
             <div className="flex-1">
               <Field label="Frequency">
                 <Select
@@ -136,6 +196,13 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
               </Field>
             </div>
           </div>
+          {consentBlocked && <AiConsentPrompt />}
+          {suggestionError && (
+            <p className="text-sm text-danger" role="alert">
+              {suggestionError}
+            </p>
+          )}
+          {suggestion && <RentSuggestionCard suggestion={suggestion} onUse={useSuggestedRent} />}
           <div className="flex gap-2">
             <div className="flex-1">
               <Field label="Bond (optional)">

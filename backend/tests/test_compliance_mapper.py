@@ -13,6 +13,7 @@ from app.models import (
     LeaseAudit,
     LeaseFrequency,
     Property,
+    PropertyType,
 )
 from app.services import compliance
 from app.services.compliance import chain_to_audit_payload, enabled, load_chain
@@ -157,6 +158,64 @@ def test_payload_carries_the_given_jurisdiction():
     lease = _lease("2026-01-01", "2026-12-31", 600)
     payload = chain_to_audit_payload([lease], "VIC")
     assert payload["jurisdiction"] == "VIC"
+
+
+def _property(ptype=PropertyType.house, postcode="2000", city=None, bedrooms=2):
+    return Property(
+        id=uuid_mod.uuid4(),
+        organization_id=uuid_mod.uuid4(),
+        address="1 Test St",
+        city=city,
+        state="NSW",
+        postcode=postcode,
+        type=ptype,
+        bedrooms=bedrooms,
+    )
+
+
+@pytest.mark.parametrize(
+    ("ptype", "expected"),
+    [
+        (PropertyType.house, "house"),
+        (PropertyType.townhouse, "townhouse"),
+        (PropertyType.other, "other"),
+        (PropertyType.apartment, "other"),
+        (PropertyType.condo, "other"),
+    ],
+)
+def test_dwelling_type_for_maps_known_types_and_falls_back(ptype, expected):
+    assert compliance.dwelling_type_for(ptype) == expected
+
+
+def test_rent_suggestion_payload_nsw_uses_postcode_as_area_key():
+    lease = _lease("2026-01-01", "2026-12-31", 600)
+    prop = _property(postcode="2010", city="Sydney")
+    payload = compliance.rent_suggestion_payload(prop, [lease], "NSW", date(2027, 1, 1))
+    assert payload["jurisdiction"] == "NSW"
+    assert payload["property"]["area_key"] == "2010"
+    assert payload["renewal_start"] == "2027-01-01"
+
+
+def test_rent_suggestion_payload_vic_uses_city_as_area_key():
+    lease = _lease("2026-01-01", "2026-12-31", 600)
+    prop = _property(postcode="3121", city="Richmond")
+    payload = compliance.rent_suggestion_payload(prop, [lease], "VIC", date(2027, 1, 1))
+    assert payload["property"]["area_key"] == "Richmond"
+
+
+def test_rent_suggestion_payload_carries_dwelling_type_and_bedrooms():
+    lease = _lease("2026-01-01", "2026-12-31", 600)
+    prop = _property(ptype=PropertyType.townhouse, bedrooms=4)
+    payload = compliance.rent_suggestion_payload(prop, [lease], "NSW", date(2027, 1, 1))
+    assert payload["property"]["dwelling_type"] == "townhouse"
+    assert payload["property"]["bedrooms"] == 4
+
+
+def test_rent_suggestion_payload_lease_matches_chain_to_audit_payload():
+    lease = _lease("2026-01-01", "2026-12-31", 600, bond=2400)
+    prop = _property()
+    payload = compliance.rent_suggestion_payload(prop, [lease], "NSW", date(2027, 1, 1))
+    assert payload["lease"] == chain_to_audit_payload([lease], "NSW")["lease"]
 
 
 async def test_resolve_jurisdiction_by_property_state(db_session):

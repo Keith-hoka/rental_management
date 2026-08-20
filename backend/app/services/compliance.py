@@ -11,7 +11,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import ComplianceAuditQueue, ComplianceSyncState, Lease, LeaseAudit
+from app.models import (
+    ComplianceAuditQueue,
+    ComplianceSyncState,
+    Lease,
+    LeaseAudit,
+    Property,
+    PropertyType,
+)
 from app.services.jurisdiction import JurisdictionUnresolved, property_jurisdiction
 from app.services.notify import manager_emails, manager_user_ids, notify_users, safe_send
 
@@ -36,6 +43,16 @@ async def create_audit(payload: dict) -> dict:
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.post(
             f"{settings.compliance_api_url}/v1/audits", json=payload, headers=_headers()
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def create_rent_suggestion(payload: dict) -> dict:
+    """POST a renewal rent-suggestion request to the compliance service and return its body."""
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        response = await client.post(
+            f"{settings.compliance_api_url}/v1/rent-suggestions", json=payload, headers=_headers()
         )
         response.raise_for_status()
         return response.json()
@@ -120,6 +137,36 @@ def chain_to_audit_payload(chain: list[Lease], jurisdiction: str) -> dict:
     if increases:
         lease_body["rent_increases"] = increases
     return {"jurisdiction": jurisdiction, "client_ref": str(newest.id), "lease": lease_body}
+
+
+_SUGGESTION_DWELLING_TYPES = {"house", "unit", "townhouse", "other"}
+
+
+def dwelling_type_for(property_type: PropertyType) -> str:
+    """The compliance service's dwelling_type for a property type; unmapped types fall back to other."""
+    value = property_type.value
+    return value if value in _SUGGESTION_DWELLING_TYPES else "other"
+
+
+def rent_suggestion_payload(
+    property_row: Property, chain: list[Lease], jurisdiction: str, renewal_start: date
+) -> dict:
+    """The compliance rent-suggestion request for a renewal chain.
+
+    area_key is the property's suburb in VIC, where Homes Victoria reports by
+    suburb, and its postcode in NSW, where Fair Trading reports by postcode.
+    """
+    area_key = property_row.city if jurisdiction == "VIC" else property_row.postcode
+    return {
+        "jurisdiction": jurisdiction,
+        "property": {
+            "area_key": area_key,
+            "dwelling_type": dwelling_type_for(property_row.type),
+            "bedrooms": property_row.bedrooms,
+        },
+        "lease": chain_to_audit_payload(chain, jurisdiction)["lease"],
+        "renewal_start": renewal_start.isoformat(),
+    }
 
 
 async def run_lease_audit(session: AsyncSession, lease: Lease) -> LeaseAudit:
