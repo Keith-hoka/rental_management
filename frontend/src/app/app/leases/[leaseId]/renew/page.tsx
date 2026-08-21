@@ -114,6 +114,8 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
       const detail = err instanceof ApiError ? (err.detail as { code?: string } | null) : null;
       if (detail?.code === "ai_consent_required") {
         setConsentBlocked(true);
+      } else if (detail?.code === "judge_timeout") {
+        setSuggestionError("Suggestion timed out, try again.");
       } else {
         setSuggestionError("Suggestion unavailable, try again.");
       }
@@ -124,6 +126,15 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
 
   function useSuggestedRent(weekly: number) {
     setRent(toFrequencyAmount(weekly, frequency));
+  }
+
+  /** A renewal-start edit invalidates any suggestion computed for the old
+   * date: the law card is date-driven, so a stale card could show a
+   * suggestion the new date would actually block. */
+  function updateStartDate(value: string) {
+    setStartDate(value);
+    setSuggestion(null);
+    setSuggestionError(null);
   }
 
   if (!me) return null;
@@ -256,7 +267,7 @@ export default function RenewLeasePage({ params }: { params: Promise<{ leaseId: 
                   type="date"
                   required
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => updateStartDate(e.target.value)}
                 />
               </Field>
             </div>

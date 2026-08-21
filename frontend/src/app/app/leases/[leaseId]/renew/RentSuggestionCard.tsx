@@ -81,8 +81,16 @@ export function RentSuggestionCard({
       </p>
       {market && <p className="mt-2 text-sm text-text">{marketLine(market)}</p>}
       {market && <p className="text-xs text-muted">Source: {market.source.name}</p>}
-      {requiresCcByAttribution && (
-        <p className="text-xs text-muted">Data: Homes Victoria Rental Report, CC BY 4.0</p>
+      {market === null && (
+        <p className="mt-2 text-sm text-warning">
+          No market data for this area - the suggestion is capped guidance only, not a market
+          comparison.
+        </p>
+      )}
+      {market && requiresCcByAttribution && (
+        <p className="text-xs text-muted">
+          Data: {market.source.name}, {market.source.licence}
+        </p>
       )}
       {suggestion.law_card.length > 0 && (
         <ul className="mt-2 divide-y divide-border">

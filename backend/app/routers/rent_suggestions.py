@@ -47,6 +47,9 @@ async def create_rent_suggestion(
     )
     try:
         result = await compliance.create_rent_suggestion(payload)
+    except httpx.TimeoutException as exc:
+        logger.warning("Rent suggestion timed out for lease %s: %s", lease_id, exc)
+        raise HTTPException(status_code=504, detail={"code": "judge_timeout"}) from exc
     except httpx.HTTPError as exc:
         logger.warning("Rent suggestion failed for lease %s: %s", lease_id, exc)
         raise HTTPException(status_code=502, detail={"code": "judge_unavailable"}) from exc

@@ -3,6 +3,7 @@ import uuid
 import httpx
 import pytest
 
+from app.services import compliance
 from tests.test_clause_audit_service import _org_and_user
 from tests.test_leases import lease_body
 from tests.test_properties_crud import landlord_headers
@@ -262,3 +263,50 @@ async def test_post_service_502_is_passthrough(client, db_session, compliance_on
 
     assert response.status_code == 502
     assert response.json()["detail"] == {"code": "judge_unavailable"}
+
+
+async def test_post_service_timeout_is_504(client, db_session, compliance_on, monkeypatch):
+    headers, lease_id = await _setup(client, db_session, "rs504@example.com", "11 Suggest St")
+    request = httpx.Request("POST", "http://service/v1/rent-suggestions")
+    error = httpx.TimeoutException("timed out", request=request)
+    captured = []
+    _fake_create(monkeypatch, captured, raises=error)
+
+    response = await client.post(
+        f"/api/v1/leases/{lease_id}/rent-suggestion", json=BODY, headers=headers
+    )
+
+    assert response.status_code == 504
+    assert response.json()["detail"] == {"code": "judge_timeout"}
+
+
+async def test_create_rent_suggestion_uses_dedicated_timeout(compliance_on, monkeypatch):
+    """Rent suggestions get their own (longer) timeout, independent of TIMEOUT."""
+    captured = {}
+
+    class _FakeResponse:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> dict:
+            return {}
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            captured["timeout"] = kwargs.get("timeout")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc_info):
+            return False
+
+        async def post(self, url, **kwargs):
+            return _FakeResponse()
+
+    monkeypatch.setattr("app.services.compliance.httpx.AsyncClient", _FakeAsyncClient)
+
+    await compliance.create_rent_suggestion({})
+
+    assert captured["timeout"] == compliance.RENT_SUGGESTION_TIMEOUT
+    assert compliance.RENT_SUGGESTION_TIMEOUT != compliance.TIMEOUT

@@ -25,6 +25,9 @@ from app.services.notify import manager_emails, manager_user_ids, notify_users, 
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 10.0
+# Rent suggestions run an LLM call that can chain into a backup provider on
+# failure, well past the 10s budget that suits the other, non-LLM endpoints.
+RENT_SUGGESTION_TIMEOUT = 45.0
 CURSOR_KEY = "audit_changes_cursor"
 PAGE_LIMIT = 100
 
@@ -50,7 +53,7 @@ async def create_audit(payload: dict) -> dict:
 
 async def create_rent_suggestion(payload: dict) -> dict:
     """POST a renewal rent-suggestion request to the compliance service and return its body."""
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=RENT_SUGGESTION_TIMEOUT) as client:
         response = await client.post(
             f"{settings.compliance_api_url}/v1/rent-suggestions", json=payload, headers=_headers()
         )

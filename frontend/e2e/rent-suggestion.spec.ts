@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 const LIVE = !!process.env.RENT_SUGGESTION_E2E;
 
+const NO_MARKET_DATA_TEXT =
+  "No market data for this area - the suggestion is capped guidance only, not a market comparison.";
+
 function isoDate(offsetDays: number): string {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -44,6 +47,20 @@ const CANNED_SUGGESTION = {
   ],
   law_blocked: false,
   reasoning: "Median 760 supports 720.",
+  model: "claude-sonnet-5",
+  engine_version: "1.6.0",
+  disclaimer: "General information, not legal advice.",
+};
+
+const CANNED_NO_DATA_SUGGESTION = {
+  current_weekly: "600",
+  suggested_weekly: "675",
+  range: { low: "600", high: "690" },
+  market_gap: "no_data",
+  market: null,
+  law_card: [],
+  law_blocked: false,
+  reasoning: "No comparable market data was found for this area; capped at 15% above current.",
   model: "claude-sonnet-5",
   engine_version: "1.6.0",
   disclaimer: "General information, not legal advice.",
@@ -117,10 +134,33 @@ test("consented renew page shows a mocked suggestion and fills the rent field", 
 
   await expect(page.getByText("$720")).toBeVisible();
   await expect(page.getByTestId("ai-consent-card")).not.toBeVisible();
+  await expect(page.getByText(NO_MARKET_DATA_TEXT)).not.toBeVisible();
 
   await page.getByRole("button", { name: "Use suggestion" }).click();
   // The lease defaults to monthly: 720 weekly -> round(720 * 52 / 12) = 3120.
   await expect(page.getByLabel("Rent", { exact: true })).toHaveValue("3120");
+
+  // Editing the renewal start invalidates the card: it was computed for the
+  // old date, and the (date-driven) law card could disagree with the new one.
+  await page.getByLabel("Start").fill(isoDate(35));
+  await expect(page.getByText("$720")).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Use suggestion" })).not.toBeVisible();
+});
+
+test("no market data renders capped guidance instead of a market comparison", async ({
+  page,
+}) => {
+  const renewUrl = await openRenewPage(page);
+  await enableRentAi(page);
+  await page.goto(renewUrl);
+
+  await page.route("**/rent-suggestion", (route) =>
+    route.fulfill({ json: CANNED_NO_DATA_SUGGESTION }),
+  );
+  await page.getByRole("button", { name: "Suggest rent" }).click();
+
+  await expect(page.getByText("$675")).toBeVisible();
+  await expect(page.getByText(NO_MARKET_DATA_TEXT)).toBeVisible();
 });
 
 test("live: suggests a renewal rent from the real compliance service", async ({ page }) => {
