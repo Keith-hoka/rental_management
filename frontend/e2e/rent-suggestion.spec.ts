@@ -5,6 +5,9 @@ const LIVE = !!process.env.RENT_SUGGESTION_E2E;
 const NO_MARKET_DATA_TEXT =
   "No market data for this area - the suggestion is capped guidance only, not a market comparison.";
 
+const STALE_MARKET_TEXT =
+  "Market data runs to 2025-09-30, more than six months before the as-at date - treat the comparison as indicative.";
+
 function isoDate(offsetDays: number): string {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -17,7 +20,10 @@ const CANNED_SUGGESTION = {
   range: { low: "600", high: "690" },
   market_gap: "within",
   market: {
+    area_label: "2000",
     period: "2026-07",
+    period_end: "2026-07-31",
+    stale: false,
     median: "760",
     p25: "698",
     p75: "886",
@@ -47,6 +53,35 @@ const CANNED_SUGGESTION = {
   ],
   law_blocked: false,
   reasoning: "Median 760 supports 720.",
+  model: "claude-sonnet-5",
+  engine_version: "1.6.0",
+  disclaimer: "General information, not legal advice.",
+};
+
+const CANNED_STALE_SUGGESTION = {
+  current_weekly: "600",
+  suggested_weekly: "645",
+  range: { low: "600", high: "690" },
+  market_gap: "within",
+  market: {
+    area_label: "2148",
+    period: "2025-Q3",
+    period_end: "2025-09-30",
+    stale: true,
+    median: "705",
+    p25: "650",
+    p75: "780",
+    sample_size: 96,
+    fallback: null,
+    source: {
+      name: "NSW Fair Trading rental bond lodgements",
+      url: "https://www.nsw.gov.au/housing-and-construction/rental-forms-surveys-and-data/rental-bond-data",
+      licence: "NSW Government open data (terms on the source page)",
+    },
+  },
+  law_card: [],
+  law_blocked: false,
+  reasoning: "Median 705 is several quarters old; treat 645 as indicative only.",
   model: "claude-sonnet-5",
   engine_version: "1.6.0",
   disclaimer: "General information, not legal advice.",
@@ -134,7 +169,9 @@ test("consented renew page shows a mocked suggestion and fills the rent field", 
 
   await expect(page.getByText("$720")).toBeVisible();
   await expect(page.getByTestId("ai-consent-card")).not.toBeVisible();
+  await expect(page.getByText("Market (2000)", { exact: false })).toBeVisible();
   await expect(page.getByText(NO_MARKET_DATA_TEXT)).not.toBeVisible();
+  await expect(page.getByText(STALE_MARKET_TEXT)).not.toBeVisible();
 
   await page.getByRole("button", { name: "Use suggestion" }).click();
   // The lease defaults to monthly: 720 weekly -> round(720 * 52 / 12) = 3120.
@@ -161,6 +198,22 @@ test("no market data renders capped guidance instead of a market comparison", as
 
   await expect(page.getByText("$675")).toBeVisible();
   await expect(page.getByText(NO_MARKET_DATA_TEXT)).toBeVisible();
+});
+
+test("stale market data renders a staleness warning alongside the comparison", async ({
+  page,
+}) => {
+  const renewUrl = await openRenewPage(page);
+  await enableRentAi(page);
+  await page.goto(renewUrl);
+
+  await page.route("**/rent-suggestion", (route) =>
+    route.fulfill({ json: CANNED_STALE_SUGGESTION }),
+  );
+  await page.getByRole("button", { name: "Suggest rent" }).click();
+
+  await expect(page.getByText("$645")).toBeVisible();
+  await expect(page.getByText(STALE_MARKET_TEXT)).toBeVisible();
 });
 
 test("live: suggests a renewal rent from the real compliance service", async ({ page }) => {

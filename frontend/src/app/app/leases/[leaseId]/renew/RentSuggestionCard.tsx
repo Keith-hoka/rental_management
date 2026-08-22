@@ -32,9 +32,13 @@ const FALLBACK_LABELS: Record<string, string> = {
 };
 
 function marketLine(market: SuggestionMarket): string {
-  const base = `Market ${market.period}: median ${market.median}, n=${market.sample_size}`;
+  const base = `Market (${market.area_label}) ${market.period}: median ${market.median}, n=${market.sample_size}`;
   if (!market.fallback) return base;
   return `${base} (${FALLBACK_LABELS[market.fallback] ?? market.fallback})`;
+}
+
+function staleLine(market: SuggestionMarket): string {
+  return `Market data runs to ${market.period_end}, more than six months before the as-at date - treat the comparison as indicative.`;
 }
 
 function LawCardRow({ finding }: { finding: LawCardFinding }) {
@@ -81,6 +85,9 @@ export function RentSuggestionCard({
       </p>
       {market && <p className="mt-2 text-sm text-text">{marketLine(market)}</p>}
       {market && <p className="text-xs text-muted">Source: {market.source.name}</p>}
+      {market && market.stale && (
+        <p className="mt-2 text-sm text-warning">{staleLine(market)}</p>
+      )}
       {market === null && (
         <p className="mt-2 text-sm text-warning">
           No market data for this area - the suggestion is capped guidance only, not a market

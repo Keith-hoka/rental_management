@@ -25,7 +25,10 @@ export interface SuggestionSource {
 }
 
 export interface SuggestionMarket {
+  area_label: string;
   period: string;
+  period_end: string;
+  stale: boolean;
   median: string;
   p25: string | null;
   p75: string | null;
