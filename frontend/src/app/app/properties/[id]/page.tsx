@@ -2,9 +2,11 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { ApiError } from "@/lib/api";
 import { formatAddress, getProperty, imageSrc, type Property } from "@/lib/properties";
 import { getLeaseBalance, listLeasePayments, type BalanceInfo } from "@/lib/payments";
 import { listMaintenance, type MaintenanceInfo } from "@/lib/maintenance";
+import { getMarketRent, type MarketRentEnvelope } from "@/lib/marketRent";
 import { AppShell } from "@/components/app-shell";
 import { useShell } from "@/components/use-shell";
 import {
@@ -18,6 +20,7 @@ import {
   linkButton,
   linkButtonOutline,
 } from "@/components/ui";
+import { MarketRentCard, type MarketRentState } from "./MarketRentCard";
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -27,6 +30,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [balance, setBalance] = useState<BalanceInfo | null>(null);
   const [collected, setCollected] = useState(0);
   const [requests, setRequests] = useState<MaintenanceInfo[]>([]);
+  const [marketRent, setMarketRent] = useState<MarketRentEnvelope | null>(null);
+  const [marketState, setMarketState] = useState<MarketRentState>("loading");
 
   useEffect(() => {
     if (!me) return;
@@ -49,6 +54,16 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         if (active) setRequests(all.filter((m) => m.property_address === p.address));
       })
       .catch(() => active && setError("Property not found"));
+    getMarketRent(id)
+      .then((m) => {
+        if (!active) return;
+        setMarketRent(m);
+        setMarketState("ok");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setMarketState(err instanceof ApiError && err.status === 422 ? "incomplete" : "unavailable");
+      });
     return () => {
       active = false;
     };
@@ -144,6 +159,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 <p className="text-sm text-muted">Vacant — no active lease.</p>
               )}
             </Card>
+
+            <MarketRentCard state={marketState} data={marketRent} />
 
             <Card title="Maintenance requests">
               <DataList>
