@@ -228,8 +228,8 @@ async def test_post_vic_uses_city_as_area_key(client, db_session, compliance_on,
         ("house", "house"),
         ("townhouse", "townhouse"),
         ("other", "other"),
-        ("apartment", "other"),
-        ("condo", "other"),
+        ("apartment", "unit"),
+        ("condo", "unit"),
     ],
 )
 async def test_post_maps_dwelling_type(

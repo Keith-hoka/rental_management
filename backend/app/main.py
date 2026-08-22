@@ -20,6 +20,7 @@ from app.routers.inspections import router as inspections_router
 from app.routers.invitations import router as invitations_router
 from app.routers.leases import router as leases_router
 from app.routers.maintenance import router as maintenance_router
+from app.routers.market_rent import router as market_rent_router
 from app.routers.notifications import router as notifications_router
 from app.routers.payments import router as payments_router
 from app.routers.portal import router as portal_router
@@ -62,6 +63,7 @@ app.include_router(inspections_router)
 app.include_router(properties_router)
 app.include_router(rent_router)
 app.include_router(rent_suggestions_router)
+app.include_router(market_rent_router)
 app.include_router(invitations_router)
 app.include_router(leases_router)
 app.include_router(maintenance_router)

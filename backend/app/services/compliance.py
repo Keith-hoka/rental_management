@@ -142,13 +142,23 @@ def chain_to_audit_payload(chain: list[Lease], jurisdiction: str) -> dict:
     return {"jurisdiction": jurisdiction, "client_ref": str(newest.id), "lease": lease_body}
 
 
-_SUGGESTION_DWELLING_TYPES = {"house", "unit", "townhouse", "other"}
+_DWELLING_TYPES = {
+    PropertyType.apartment: "unit",
+    PropertyType.condo: "unit",
+    PropertyType.house: "house",
+    PropertyType.townhouse: "townhouse",
+    PropertyType.other: "other",
+}
 
 
 def dwelling_type_for(property_type: PropertyType) -> str:
-    """The compliance service's dwelling_type for a property type; unmapped types fall back to other."""
-    value = property_type.value
-    return value if value in _SUGGESTION_DWELLING_TYPES else "other"
+    """The compliance service's dwelling_type for a property type; flats are units."""
+    return _DWELLING_TYPES[property_type]
+
+
+def area_key_for(property_row: Property, jurisdiction: str) -> str:
+    """The jurisdiction-native area key: VIC reports by suburb, NSW by postcode."""
+    return (property_row.city if jurisdiction == "VIC" else property_row.postcode) or ""
 
 
 def rent_suggestion_payload(
@@ -159,7 +169,7 @@ def rent_suggestion_payload(
     area_key is the property's suburb in VIC, where Homes Victoria reports by
     suburb, and its postcode in NSW, where Fair Trading reports by postcode.
     """
-    area_key = property_row.city if jurisdiction == "VIC" else property_row.postcode
+    area_key = area_key_for(property_row, jurisdiction)
     return {
         "jurisdiction": jurisdiction,
         "property": {
@@ -170,6 +180,26 @@ def rent_suggestion_payload(
         "lease": chain_to_audit_payload(chain, jurisdiction)["lease"],
         "renewal_start": renewal_start.isoformat(),
     }
+
+
+def market_rent_params(property_row: Property, jurisdiction: str) -> dict:
+    """Query parameters for the compliance market-rent endpoint."""
+    return {
+        "jurisdiction": jurisdiction,
+        "area": area_key_for(property_row, jurisdiction),
+        "dwelling_type": dwelling_type_for(property_row.type),
+        "bedrooms": property_row.bedrooms,
+    }
+
+
+async def get_market_rent(params: dict) -> dict:
+    """GET the compliance market-rent estimate and return its body."""
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        response = await client.get(
+            f"{settings.compliance_api_url}/v1/market-rent", params=params, headers=_headers()
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 async def run_lease_audit(session: AsyncSession, lease: Lease) -> LeaseAudit:

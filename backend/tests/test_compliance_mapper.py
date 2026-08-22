@@ -176,14 +176,14 @@ def _property(ptype=PropertyType.house, postcode="2000", city=None, bedrooms=2):
 @pytest.mark.parametrize(
     ("ptype", "expected"),
     [
+        (PropertyType.apartment, "unit"),
+        (PropertyType.condo, "unit"),
         (PropertyType.house, "house"),
         (PropertyType.townhouse, "townhouse"),
         (PropertyType.other, "other"),
-        (PropertyType.apartment, "other"),
-        (PropertyType.condo, "other"),
     ],
 )
-def test_dwelling_type_for_maps_known_types_and_falls_back(ptype, expected):
+def test_dwelling_type_for_maps_flats_to_unit(ptype, expected):
     assert compliance.dwelling_type_for(ptype) == expected
 
 
